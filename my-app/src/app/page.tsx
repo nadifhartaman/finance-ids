@@ -2,7 +2,7 @@ import Link from "next/link";
 import ChartPlaceholder from "@/components/dashboard/ChartPlaceholder";
 import HeroCard from "@/components/dashboard/HeroCard";
 import NeedsAttention from "@/components/dashboard/NeedsAttention";
-import SectionCard from "@/components/dashboard/SectionCard";
+import SectionCard from "@/components/ui/section-card";
 import StatCard from "@/components/dashboard/StatCard";
 import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
 import { Chip } from "@/components/ui/chip";
@@ -54,9 +54,12 @@ export default function Home() {
           title="Money coming in"
           question="Are we on track to hit this month's revenue target?"
           action={
-            <span className="rounded-lg border border-card-border px-3 py-1.5 text-xs font-medium text-ink-secondary">
-              Monthly ⌄
-            </span>
+            <Link
+              href="/trends"
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              See all →
+            </Link>
           }
         >
           <ChartPlaceholder kind="bars" caption="Revenue vs target, by month" />

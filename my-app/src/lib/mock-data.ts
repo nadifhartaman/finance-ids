@@ -329,6 +329,97 @@ export const projectBudgets: BudgetItem[] = projects
     spent: p.spent,
   }));
 
+/* ─────────────────────────── Trends ─────────────────────────── */
+
+export interface MonthlyRevenue {
+  month: string;
+  revenue: number; // IDR
+  target: number; // IDR
+}
+
+/** June matches the Dashboard headline: Rp 3,435 jt vs Rp 4 M target ≈ 85%. */
+export const monthlyRevenue: MonthlyRevenue[] = [
+  { month: "Jan", revenue: 2_650_000_000, target: 2_800_000_000 },
+  { month: "Feb", revenue: 2_900_000_000, target: 3_000_000_000 },
+  { month: "Mar", revenue: 3_050_000_000, target: 3_200_000_000 },
+  { month: "Apr", revenue: 3_150_000_000, target: 3_400_000_000 },
+  { month: "May", revenue: 3_300_000_000, target: 3_600_000_000 },
+  { month: "Jun", revenue: 3_435_000_000, target: 4_000_000_000 },
+];
+
+const PRODUCT_LINES: ProductLine[] = [
+  "VIANA",
+  "ORION",
+  "AIoT",
+  "Indi AI",
+  "3D Digital Twin",
+];
+
+/** Every invoice's `project` name is prefixed by its product line. */
+function productLineOf(projectName: string): ProductLine {
+  return PRODUCT_LINES.find((line) => projectName.startsWith(line))!;
+}
+
+export interface ProductLineRevenue {
+  productLine: ProductLine;
+  amount: number; // IDR
+}
+
+/** Derived from `invoices` — all 25 invoices grouped by product line. */
+export const revenueByProductLine: ProductLineRevenue[] = PRODUCT_LINES.map(
+  (productLine) => ({
+    productLine,
+    amount: invoices
+      .filter((i) => productLineOf(i.project) === productLine)
+      .reduce((sum, i) => sum + i.amount, 0),
+  }),
+).sort((a, b) => b.amount - a.amount);
+
+export type ClientType = "Government (B2G)" | "Private (B2B)";
+
+/** B2B clients are named explicitly; every other client is Government (B2G). */
+const B2B_CLIENTS = new Set(["Pertamina"]);
+
+export interface ClientTypeRevenue {
+  type: ClientType;
+  amount: number; // IDR
+}
+
+/** Derived from `invoices` — all 25 invoices grouped by client type. */
+export const revenueByClientType: ClientTypeRevenue[] = [
+  {
+    type: "Government (B2G)",
+    amount: invoices
+      .filter((i) => !B2B_CLIENTS.has(i.client))
+      .reduce((sum, i) => sum + i.amount, 0),
+  },
+  {
+    type: "Private (B2B)",
+    amount: invoices
+      .filter((i) => B2B_CLIENTS.has(i.client))
+      .reduce((sum, i) => sum + i.amount, 0),
+  },
+];
+
+export const revenueThisYear = monthlyRevenue.reduce(
+  (sum, m) => sum + m.revenue,
+  0,
+);
+const yearTarget = monthlyRevenue.reduce((sum, m) => sum + m.target, 0);
+export const yearTargetPct = Math.round((revenueThisYear / yearTarget) * 100);
+
+const totalRevenueAllClients = revenueByClientType.reduce(
+  (sum, c) => sum + c.amount,
+  0,
+);
+export const governmentSharePct = Math.round(
+  (revenueByClientType.find((c) => c.type === "Government (B2G)")!.amount /
+    totalRevenueAllClients) *
+    100,
+);
+
+export const topProductLine = revenueByProductLine[0].productLine;
+
 /**
  * Indonesian short-scale money label: M = miliar (billion), jt = juta (million).
  * Matches how the delta strings above are written.
