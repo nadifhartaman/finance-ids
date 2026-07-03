@@ -1,7 +1,7 @@
-import { ChartBarIcon, TrendingUpIcon, WalletIcon } from "@/app/components/shell/icons";
-import { Chip, type ChipColor } from "@/app/components/ui/chip";
-import type { HeadlineStat } from "@/app/lib/mock-data";
-import { formatRupiah } from "@/app/lib/mock-data";
+import { ChartBarIcon, TrendingUpIcon, WalletIcon } from "@/components/shell/icons";
+import { Chip, type ChipColor } from "@/components/ui/chip";
+import type { HeadlineStat } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/mock-data";
 
 const STATUS: Record<HeadlineStat["status"], { color: ChipColor; label: string }> = {
   good: { color: "success", label: "Healthy" },

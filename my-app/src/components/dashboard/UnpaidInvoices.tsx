@@ -1,6 +1,6 @@
-import { Chip } from "@/app/components/ui/chip";
-import type { UnpaidInvoice } from "@/app/lib/mock-data";
-import { formatRupiah } from "@/app/lib/mock-data";
+import { Chip } from "@/components/ui/chip";
+import type { UnpaidInvoice } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/mock-data";
 
 export default function UnpaidInvoices({
   invoices,

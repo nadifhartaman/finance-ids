@@ -1,5 +1,5 @@
-import { Chip, type ChipColor } from "@/app/components/ui/chip";
-import type { AttentionItem } from "@/app/lib/mock-data";
+import { Chip, type ChipColor } from "@/components/ui/chip";
+import type { AttentionItem } from "@/lib/mock-data";
 
 const SEVERITY: Record<AttentionItem["severity"], { color: ChipColor; label: string }> = {
   critical: { color: "error", label: "Urgent" },

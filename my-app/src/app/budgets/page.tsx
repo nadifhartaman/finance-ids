@@ -1,4 +1,4 @@
-import PageStub from "@/app/components/dashboard/PageStub";
+import PageStub from "@/components/dashboard/PageStub";
 
 export default function BudgetsPage() {
   return (

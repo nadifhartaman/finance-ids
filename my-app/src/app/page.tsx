@@ -1,10 +1,10 @@
-import ChartPlaceholder from "@/app/components/dashboard/ChartPlaceholder";
-import HeroCard from "@/app/components/dashboard/HeroCard";
-import NeedsAttention from "@/app/components/dashboard/NeedsAttention";
-import SectionCard from "@/app/components/dashboard/SectionCard";
-import StatCard from "@/app/components/dashboard/StatCard";
-import UnpaidInvoices from "@/app/components/dashboard/UnpaidInvoices";
-import { Chip } from "@/app/components/ui/chip";
+import ChartPlaceholder from "@/components/dashboard/ChartPlaceholder";
+import HeroCard from "@/components/dashboard/HeroCard";
+import NeedsAttention from "@/components/dashboard/NeedsAttention";
+import SectionCard from "@/components/dashboard/SectionCard";
+import StatCard from "@/components/dashboard/StatCard";
+import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
+import { Chip } from "@/components/ui/chip";
 import {
   asOf,
   attentionItems,
@@ -14,7 +14,7 @@ import {
   projectStats,
   totalUnpaid,
   unpaidInvoices,
-} from "@/app/lib/mock-data";
+} from "@/lib/mock-data";
 
 export default function Home() {
   const cash = headlineStats.find((s) => s.id === "cash")!;
