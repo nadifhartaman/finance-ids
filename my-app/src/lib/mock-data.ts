@@ -24,15 +24,6 @@ export interface AttentionItem {
   suggestedAction: string;
 }
 
-export interface ProjectStats {
-  active: number;
-  nearBilling: number;
-  overBudget: number;
-  /** Signed but not yet billed */
-  pipelineValue: number; // IDR
-  flaggedProject: string;
-}
-
 export const asOf = "30 June 2026";
 export const period = "June 2026";
 
@@ -87,14 +78,6 @@ export const attentionItems: AttentionItem[] = [
     suggestedAction: "Check the operations category before approving new spending.",
   },
 ];
-
-export const projectStats: ProjectStats = {
-  active: 12,
-  nearBilling: 3,
-  overBudget: 1,
-  pipelineValue: 9_600_000_000,
-  flaggedProject: "VIANA – Dishub",
-};
 
 /* ─────────────────────────── Invoices ─────────────────────────── */
 
@@ -195,6 +178,156 @@ export const unpaidInvoices = invoices
   .filter((i) => invoiceStatus(i).kind !== "paid")
   .sort((a, b) => b.amount - a.amount)
   .slice(0, 4);
+
+/* ─────────────────────────── Budgets ─────────────────────────── */
+
+export interface BudgetItem {
+  id: string;
+  name: string;
+  subtitle?: string; // client name, for project budgets
+  budget: number; // IDR
+  spent: number; // IDR
+}
+
+export type BudgetHealthKind = "on-track" | "near-limit" | "over";
+
+export interface BudgetHealth {
+  kind: BudgetHealthKind;
+  label: string;
+  pctUsed: number; // rounded, uncapped (can exceed 100)
+  remaining: number; // negative when over budget
+}
+
+/** Health is derived from budget/spent, never stored — one source of truth. */
+export function budgetHealth(item: BudgetItem): BudgetHealth {
+  const pctUsed = Math.round((item.spent / item.budget) * 100);
+  const remaining = item.budget - item.spent;
+  if (pctUsed > 100) {
+    return { kind: "over", label: "Over budget", pctUsed, remaining };
+  }
+  if (pctUsed >= 90) {
+    return { kind: "near-limit", label: "Close to the limit", pctUsed, remaining };
+  }
+  return { kind: "on-track", label: "On track", pctUsed, remaining };
+}
+
+export const categoryBudgets: BudgetItem[] = [
+  { id: "cat-payroll", name: "Payroll", budget: 1_400_000_000, spent: 1_350_000_000 },
+  { id: "cat-operations", name: "Operations", budget: 650_000_000, spent: 702_000_000 },
+  { id: "cat-project-costs", name: "Project costs", budget: 900_000_000, spent: 720_000_000 },
+];
+
+export const totalBudget = categoryBudgets.reduce((s, b) => s + b.budget, 0);
+export const totalSpent = categoryBudgets.reduce((s, b) => s + b.spent, 0);
+export const totalRemaining = totalBudget - totalSpent;
+export const pctBudgetUsed = Math.round((totalSpent / totalBudget) * 100);
+
+export const budgetInsights: string[] = [
+  "Operations spent Rp 52 jt more than planned this month.",
+  "VIANA – Dishub is 20% over its project budget — see Needs attention on the Dashboard.",
+  `Project costs still have ${formatRupiah(180_000_000)} left to spend this month.`,
+];
+
+/* ─────────────────────────── Projects ─────────────────────────── */
+
+export type ProductLine = "VIANA" | "ORION" | "AIoT" | "Indi AI" | "3D Digital Twin";
+
+export interface Project {
+  id: string;
+  name: string;
+  client: string;
+  productLine: ProductLine;
+  contractValue: number; // IDR
+  billedToDate: number; // IDR
+  /** Only tracked for a subset of projects — absent means no budget monitoring yet. */
+  budget?: number; // IDR
+  spent?: number; // IDR
+}
+
+export type ProjectHealthKind = "over-budget" | "near-billing" | "on-schedule";
+
+export interface ProjectHealthInfo {
+  kind: ProjectHealthKind;
+  label: string;
+  progressPct: number; // billed / contractValue, rounded
+}
+
+/** Health is derived from contract/billing/budget figures, never stored. */
+export function projectHealth(project: Project): ProjectHealthInfo {
+  const progressPct = Math.round(
+    (project.billedToDate / project.contractValue) * 100,
+  );
+  if (project.budget !== undefined && project.spent !== undefined) {
+    const pctBudgetUsedForProject = Math.round(
+      (project.spent / project.budget) * 100,
+    );
+    if (pctBudgetUsedForProject > 100) {
+      return { kind: "over-budget", label: "Over budget", progressPct };
+    }
+  }
+  if (progressPct >= 90) {
+    return { kind: "near-billing", label: "Close to billing", progressPct };
+  }
+  return { kind: "on-schedule", label: "On schedule", progressPct };
+}
+
+const PROJECT_HEALTH_ORDER: Record<ProjectHealthKind, number> = {
+  "over-budget": 0,
+  "near-billing": 1,
+  "on-schedule": 2,
+};
+
+export const projects: Project[] = [
+  { id: "prj-01", name: "VIANA – Dishub", client: "Dishub", productLine: "VIANA", contractValue: 1_200_000_000, billedToDate: 850_000_000, budget: 850_000_000, spent: 1_020_000_000 },
+  { id: "prj-02", name: "ORION – Refinery Sensors", client: "Pertamina", productLine: "ORION", contractValue: 1_000_000_000, billedToDate: 940_000_000, budget: 900_000_000, spent: 702_000_000 },
+  { id: "prj-03", name: "Indi AI Rollout", client: "Bapenda", productLine: "Indi AI", contractValue: 1_500_000_000, billedToDate: 800_000_000, budget: 500_000_000, spent: 460_000_000 },
+  { id: "prj-04", name: "3D Digital Twin – City Center", client: "Diskominfo", productLine: "3D Digital Twin", contractValue: 1_600_000_000, billedToDate: 700_000_000, budget: 700_000_000, spent: 385_000_000 },
+  { id: "prj-05", name: "AIoT – Patient ID", client: "RSUD Hasan Sadikin", productLine: "AIoT", contractValue: 900_000_000, billedToDate: 850_000_000, budget: 400_000_000, spent: 340_000_000 },
+  { id: "prj-06", name: "VIANA – Traffic Analytics", client: "Dishub", productLine: "VIANA", contractValue: 1_800_000_000, billedToDate: 700_000_000 },
+  { id: "prj-07", name: "ORION – Factory Monitoring", client: "Kemenperin", productLine: "ORION", contractValue: 1_600_000_000, billedToDate: 650_000_000 },
+  { id: "prj-08", name: "AIoT – Fleet Tracking", client: "Pertamina", productLine: "AIoT", contractValue: 1_900_000_000, billedToDate: 700_000_000 },
+  { id: "prj-09", name: "3D Digital Twin – Hospital Wing", client: "RSUD Hasan Sadikin", productLine: "3D Digital Twin", contractValue: 1_400_000_000, billedToDate: 550_000_000 },
+  { id: "prj-10", name: "ORION – City Sensors", client: "Diskominfo", productLine: "ORION", contractValue: 1_500_000_000, billedToDate: 600_000_000 },
+  { id: "prj-11", name: "AIoT – Smart ID", client: "Komdigi", productLine: "AIoT", contractValue: 800_000_000, billedToDate: 760_000_000 },
+  { id: "prj-12", name: "VIANA – Factory Safety", client: "Kemenperin", productLine: "VIANA", contractValue: 3_500_000_000, billedToDate: 1_000_000_000 },
+];
+
+/** Sorted flagged-first so the Director sees problems before healthy projects. */
+export const projectsSorted = [...projects].sort(
+  (a, b) =>
+    PROJECT_HEALTH_ORDER[projectHealth(a).kind] -
+    PROJECT_HEALTH_ORDER[projectHealth(b).kind],
+);
+
+const overBudgetProjects = projects.filter(
+  (p) => projectHealth(p).kind === "over-budget",
+);
+
+export const projectStats = {
+  active: projects.length,
+  nearBilling: projects.filter((p) => projectHealth(p).kind === "near-billing")
+    .length,
+  overBudget: overBudgetProjects.length,
+  /** Signed but not yet billed */
+  pipelineValue: projects.reduce(
+    (sum, p) => sum + (p.contractValue - p.billedToDate),
+    0,
+  ),
+  flaggedProject: overBudgetProjects[0]?.name ?? "",
+};
+
+/** Feeds the Budgets page — same values as before, now derived from `projects`. */
+export const projectBudgets: BudgetItem[] = projects
+  .filter((p): p is Project & { budget: number; spent: number } =>
+    p.budget !== undefined && p.spent !== undefined,
+  )
+  .map((p) => ({
+    id: p.id,
+    name: p.name,
+    subtitle: p.client,
+    budget: p.budget,
+    spent: p.spent,
+  }));
 
 /**
  * Indonesian short-scale money label: M = miliar (billion), jt = juta (million).

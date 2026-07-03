@@ -90,6 +90,14 @@ export default function Home() {
         <SectionCard
           title="Money going out"
           question="Are we spending more or less than planned?"
+          action={
+            <Link
+              href="/budgets"
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              See all →
+            </Link>
+          }
         >
           <ChartPlaceholder kind="line" caption="Spending vs plan this month" />
           <div className="mt-4">
@@ -103,6 +111,14 @@ export default function Home() {
         <SectionCard
           title="Projects"
           question="Is project work healthy, and what is close to being billable?"
+          action={
+            <Link
+              href="/projects"
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              See all →
+            </Link>
+          }
         >
           <dl className="grid grid-cols-3 gap-4">
             <div className="rounded-xl bg-soft p-3">
