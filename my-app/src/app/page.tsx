@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ChartPlaceholder from "@/components/dashboard/ChartPlaceholder";
 import HeroCard from "@/components/dashboard/HeroCard";
 import NeedsAttention from "@/components/dashboard/NeedsAttention";
@@ -74,6 +75,14 @@ export default function Home() {
         <SectionCard
           title="Money owed to us"
           question={`Clients owe us ${formatRupiah(totalUnpaid)} in unpaid invoices — who should we chase?`}
+          action={
+            <Link
+              href="/invoices"
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              See all →
+            </Link>
+          }
         >
           <UnpaidInvoices invoices={unpaidInvoices} />
         </SectionCard>
