@@ -1,65 +1,138 @@
-import Image from "next/image";
+import ChartPlaceholder from "@/app/components/dashboard/ChartPlaceholder";
+import HeroCard from "@/app/components/dashboard/HeroCard";
+import NeedsAttention from "@/app/components/dashboard/NeedsAttention";
+import SectionCard from "@/app/components/dashboard/SectionCard";
+import StatCard from "@/app/components/dashboard/StatCard";
+import UnpaidInvoices from "@/app/components/dashboard/UnpaidInvoices";
+import { Chip } from "@/app/components/ui/chip";
+import {
+  asOf,
+  attentionItems,
+  formatRupiah,
+  headlineStats,
+  period,
+  projectStats,
+  totalUnpaid,
+  unpaidInvoices,
+} from "@/app/lib/mock-data";
 
 export default function Home() {
+  const cash = headlineStats.find((s) => s.id === "cash")!;
+  const kpis = headlineStats.filter((s) => s.id !== "cash");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-title">
+            Financial health
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-1 text-sm text-ink-secondary">
+            {period} · updated {asOf}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        <Chip color="primary" dot={false}>
+          Layout preview — all numbers are dummy data
+        </Chip>
+      </header>
+
+      {/* The 3 headline numbers the Director reads first; cash is the hero */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {kpis.map((stat) => (
+          <StatCard key={stat.id} stat={stat} />
+        ))}
+        <HeroCard stat={cash} />
+      </div>
+
+      <div className="mt-4">
+        <NeedsAttention items={attentionItems} />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <SectionCard
+          title="Money coming in"
+          question="Are we on track to hit this month's revenue target?"
+          action={
+            <span className="rounded-lg border border-card-border px-3 py-1.5 text-xs font-medium text-ink-secondary">
+              Monthly ⌄
+            </span>
+          }
+        >
+          <ChartPlaceholder kind="bars" caption="Revenue vs target, by month" />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <ChartPlaceholder
+              kind="bars"
+              caption="Government vs private clients"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <ChartPlaceholder
+              kind="bars"
+              caption="By product (VIANA, ORION, AIoT, Indi AI, Digital Twin)"
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Money owed to us"
+          question={`Clients owe us ${formatRupiah(totalUnpaid)} in unpaid invoices — who should we chase?`}
+        >
+          <UnpaidInvoices invoices={unpaidInvoices} />
+        </SectionCard>
+
+        <SectionCard
+          title="Money going out"
+          question="Are we spending more or less than planned?"
+        >
+          <ChartPlaceholder kind="line" caption="Spending vs plan this month" />
+          <div className="mt-4">
+            <ChartPlaceholder
+              kind="bars"
+              caption="By category (payroll, operations, project costs)"
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Projects"
+          question="Is project work healthy, and what is close to being billable?"
+        >
+          <dl className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl bg-soft p-3">
+              <dt className="text-xs text-ink-secondary">Active projects</dt>
+              <dd className="mt-1 text-2xl font-semibold text-title">
+                {projectStats.active}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-soft p-3">
+              <dt className="text-xs text-ink-secondary">Close to billing</dt>
+              <dd className="mt-1 text-2xl font-semibold text-title">
+                {projectStats.nearBilling}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-soft p-3">
+              <dt className="text-xs text-ink-secondary">Over budget</dt>
+              <dd className="mt-1 text-2xl font-semibold text-title">
+                {projectStats.overBudget}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-title">
+            <Chip color="error">Over budget</Chip>
+            <span className="font-medium">{projectStats.flaggedProject}</span> —
+            see &ldquo;Needs attention&rdquo; above.
+          </p>
+          <p className="mt-3 border-t border-card-border pt-3 text-sm text-ink-secondary">
+            Signed work not yet billed:{" "}
+            <span className="font-semibold text-title">
+              {formatRupiah(projectStats.pipelineValue)}
+            </span>
+          </p>
+        </SectionCard>
+      </div>
+
+      <footer className="mt-8 text-center text-xs text-ink-muted">
+        Every number on this page is placeholder data for layout review — no
+        real financial data is connected yet.
+      </footer>
+    </>
   );
 }
