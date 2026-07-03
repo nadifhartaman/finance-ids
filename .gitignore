@@ -1,0 +1,18 @@
+# Agent skills & config (local-only)
+/.agents/
+/skills-lock.json
+/CLAUDE.md
+/docs/agents/
+
+# Local issue tracker
+/.scratch/
+
+# macOS
+.DS_Store
+
+# editor/IDE
+.vscode/
+.idea/
+
+# logs
+*.log

@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# env files — secrets never go in git; keep a committed .env.example instead
+.env
+.env.*
+!.env.example
+
+# logs
+logs/
+*.log
+npm-debug.log*
+
+# build output (if you add a build step later)
+dist/
+build/
+
+# test coverage
+coverage/
+
+# misc
+.DS_Store
+
+CLAUDE.md
