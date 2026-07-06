@@ -1,18 +1,21 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown";
 import { logout } from "@/lib/auth-actions";
-import { roleLabels, type AppUser } from "@/lib/roles";
-import { ChevronDownIcon, LogOutIcon } from "./icons";
+import { can, roleLabels, type AppUser } from "@/lib/roles";
+import { ChevronDownIcon, LogOutIcon, UsersIcon } from "./icons";
+import ManageUsersDialog from "./ManageUsersDialog";
 
 export default function UserMenu({ user }: { user: AppUser }) {
   const [isPending, startTransition] = useTransition();
+  const [manageOpen, setManageOpen] = useState(false);
 
   function signOut() {
     startTransition(async () => {
@@ -41,11 +44,27 @@ export default function UserMenu({ user }: { user: AppUser }) {
         <ChevronDownIcon className="size-4 text-ink-muted" />
       </DropdownMenuTrigger>
       <DropdownMenuContent placement="bottom end" className="min-w-48">
+        {can(user.role, "users.manage") && (
+          <>
+            <DropdownMenuItem onAction={() => setManageOpen(true)}>
+              <UsersIcon className="size-4 shrink-0 text-ink-muted" />
+              <span className="font-medium text-title">Manage users</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1" />
+          </>
+        )}
         <DropdownMenuItem onAction={signOut}>
           <LogOutIcon className="size-4 shrink-0 text-ink-muted" />
           <span className="font-medium text-title">Sign out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
+      {can(user.role, "users.manage") && (
+        <ManageUsersDialog
+          isOpen={manageOpen}
+          onOpenChange={setManageOpen}
+          currentUserId={user.id}
+        />
+      )}
     </DropdownMenu>
   );
 }

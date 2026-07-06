@@ -1,3 +1,13 @@
+import type { Role } from "./roles";
+
+export interface UserListItem {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+}
+
 export type HealthStatus = "good" | "watch" | "action";
 
 export interface HeadlineStat {
