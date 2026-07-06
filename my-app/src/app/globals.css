@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — Fundex/TailGrids visual language (see docs/style-guide.md).
+ * Fixed light theme: gray page plane, white cards, purple (violet) primary.
+ * Chip/status tints are reserved for health states, never decoration.
+ */
+@theme inline {
+  /* Surfaces & ink (TailGrids gray scale) */
+  --color-background: #f9fafb;
+  --color-foreground: #111827;
+  --color-card: #ffffff;
+  --color-card-border: #e5e7eb;
+  --color-title: #1f2937;
+  --color-ink-secondary: #6b7280;
+  --color-ink-muted: #9ca3af;
+  --color-soft: #f3f4f6;
+  --color-skeleton: #ede9fe;
+
+  /* Primary ramp (violet — replaces TailGrids blue) */
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+  --color-primary-800: #5b21b6;
+  --color-primary-900: #4c1d95;
+  --color-primary-950: #2e1065;
+
+  /* Tinted chip pairs (bg / text / icon) — Fundex status pills */
+  --color-chip-success-bg: #f0fdf4;
+  --color-chip-success-text: #15803d;
+  --color-chip-success-icon: #22c55e;
+  --color-chip-warning-bg: #fffbeb;
+  --color-chip-warning-text: #b45309;
+  --color-chip-warning-icon: #f59e0b;
+  --color-chip-error-bg: #fef2f2;
+  --color-chip-error-text: #b91c1c;
+  --color-chip-error-icon: #ef4444;
+  --color-chip-gray-bg: #f3f4f6;
+  --color-chip-gray-text: #374151;
+  --color-chip-gray-icon: #6b7280;
+  --color-chip-primary-bg: #f5f3ff;
+  --color-chip-primary-text: #6d28d9;
+  --color-chip-primary-icon: #8b5cf6;
+
+  /* Deltas (colored change text) */
+  --color-delta-up: #15803d;
+  --color-delta-down: #dc2626;
+
+  /* Shadows (TailGrids) */
+  --shadow-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0px 1px 3px 0px rgba(16, 24, 40, 0.1);
+  --shadow-md:
+    0px 4px 8px -2px rgba(16, 24, 40, 0.1),
+    0px 2px 4px -2px rgba(16, 24, 40, 0.06);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
