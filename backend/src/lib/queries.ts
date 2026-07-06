@@ -17,6 +17,24 @@ import { supabase } from "./supabase.js";
 
 type ExpenseCategory = Database["public"]["Enums"]["expense_category"];
 type ClientType = Database["public"]["Enums"]["client_type"];
+type UserRole = Database["public"]["Enums"]["user_role"];
+
+export interface ProfileRow {
+  id: string;
+  full_name: string;
+  role: UserRole;
+  is_active: boolean;
+}
+
+export async function fetchProfileById(id: string): Promise<ProfileRow | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, role, is_active")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
 
 export interface InvoiceRow {
   id: string;

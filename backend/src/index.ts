@@ -3,6 +3,9 @@ import express from "express";
 import { env } from "./lib/env.js";
 import { supabase } from "./lib/supabase.js";
 import { errorHandler } from "./middleware/error.js";
+import { requireAuth } from "./middleware/auth.js";
+import { authRouter } from "./routes/auth.js";
+import { meRouter } from "./routes/me.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { invoicesRouter } from "./routes/invoices.js";
@@ -27,11 +30,14 @@ app.get("/api/health/db", async (_req, res) => {
   res.json({ status: "ok", clients: count });
 });
 
-app.use("/api/dashboard", dashboardRouter);
-app.use("/api/invoices", invoicesRouter);
-app.use("/api/projects", projectsRouter);
-app.use("/api/budgets", budgetsRouter);
-app.use("/api/trends", trendsRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/me", requireAuth, meRouter);
+
+app.use("/api/dashboard", requireAuth, dashboardRouter);
+app.use("/api/invoices", requireAuth, invoicesRouter);
+app.use("/api/projects", requireAuth, projectsRouter);
+app.use("/api/budgets", requireAuth, budgetsRouter);
+app.use("/api/trends", requireAuth, trendsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
