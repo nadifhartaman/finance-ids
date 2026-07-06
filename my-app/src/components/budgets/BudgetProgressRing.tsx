@@ -1,9 +1,5 @@
-import {
-  formatRupiah,
-  pctBudgetUsed,
-  totalRemaining,
-  totalSpent,
-} from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/format";
+import type { BudgetTotals } from "@/lib/types";
 
 const SIZE = 160;
 const STROKE = 16;
@@ -11,9 +7,9 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /** Fundex donut, as a pure-SVG progress ring — no chart library needed. */
-export default function BudgetProgressRing() {
-  const isOver = pctBudgetUsed > 100;
-  const fillFraction = Math.min(pctBudgetUsed, 100) / 100;
+export default function BudgetProgressRing({ totals }: { totals: BudgetTotals }) {
+  const isOver = totals.pctUsed > 100;
+  const fillFraction = Math.min(totals.pctUsed, 100) / 100;
   const dashOffset = CIRCUMFERENCE * (1 - fillFraction);
 
   return (
@@ -29,7 +25,7 @@ export default function BudgetProgressRing() {
           height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           role="img"
-          aria-label={`${pctBudgetUsed}% of this month's budget used`}
+          aria-label={`${totals.pctUsed}% of this month's budget used`}
         >
           <circle
             cx={SIZE / 2}
@@ -58,7 +54,7 @@ export default function BudgetProgressRing() {
             dominantBaseline="middle"
             className="fill-title text-2xl font-semibold"
           >
-            {pctBudgetUsed}%
+            {totals.pctUsed}%
           </text>
         </svg>
       </div>
@@ -70,7 +66,7 @@ export default function BudgetProgressRing() {
             Spent
           </dt>
           <dd className="font-semibold text-title tabular-nums">
-            {formatRupiah(totalSpent)}
+            {formatRupiah(totals.spent)}
           </dd>
         </div>
         <div className="flex items-center justify-between text-sm">
@@ -79,7 +75,7 @@ export default function BudgetProgressRing() {
             Left to spend
           </dt>
           <dd className="font-semibold text-title tabular-nums">
-            {formatRupiah(Math.max(totalRemaining, 0))}
+            {formatRupiah(Math.max(totals.remaining, 0))}
           </dd>
         </div>
       </dl>

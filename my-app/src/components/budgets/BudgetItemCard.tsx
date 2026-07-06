@@ -1,6 +1,6 @@
 import { Chip, type ChipColor } from "@/components/ui/chip";
-import type { BudgetHealthKind, BudgetItem } from "@/lib/mock-data";
-import { budgetHealth, formatRupiah } from "@/lib/mock-data";
+import type { BudgetHealthKind, BudgetItem } from "@/lib/types";
+import { formatRupiah } from "@/lib/format";
 
 const CHIP_COLOR: Record<BudgetHealthKind, ChipColor> = {
   "on-track": "success",
@@ -22,7 +22,7 @@ export default function BudgetItemCard({
   /** Renders an "Edit budget" affordance; only passed for roles with `budgets.edit`. */
   onEdit?: () => void;
 }) {
-  const health = budgetHealth(item);
+  const health = item.health;
   const barWidth = Math.min(health.pctUsed, 100);
 
   return (

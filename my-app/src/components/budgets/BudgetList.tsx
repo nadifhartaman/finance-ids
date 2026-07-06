@@ -8,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { BudgetItem } from "@/lib/mock-data";
-import { formatRupiah } from "@/lib/mock-data";
+import type { BudgetItem, BudgetHealth, BudgetHealthKind } from "@/lib/types";
+import { formatRupiah } from "@/lib/format";
 import BudgetItemCard from "./BudgetItemCard";
 
 /**
@@ -36,11 +36,32 @@ export default function BudgetList({
     setDraft(String(item.budget));
   }
 
+  // TODO: Remove this local recompute when real PATCH endpoint lands.
+  function recomputeHealth(budget: number, spent: number): BudgetHealth {
+    const remaining = budget - spent;
+    const pctUsed = budget === 0 ? 0 : Math.round((spent / budget) * 100);
+    let kind: BudgetHealthKind = "on-track";
+    let label = "On track";
+    if (remaining < 0) {
+      kind = "over";
+      label = "Over budget";
+    } else if (remaining < budget * 0.15) {
+      kind = "near-limit";
+      label = "Close to the limit";
+    }
+    return { kind, label, pctUsed, remaining };
+  }
+
   function save(close: () => void) {
     const value = Number(draft);
     if (editing && Number.isFinite(value) && value > 0) {
       setItems((prev) =>
-        prev.map((i) => (i.id === editing.id ? { ...i, budget: value } : i))
+        prev.map((i) => {
+          if (i.id === editing.id) {
+            return { ...i, budget: value, health: recomputeHealth(value, i.spent) };
+          }
+          return i;
+        })
       );
     }
     close();
