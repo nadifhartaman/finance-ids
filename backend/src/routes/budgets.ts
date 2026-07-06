@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { spentByProject } from "../lib/aggregate.js";
 import { budgetHealth } from "../lib/derive.js";
+import { requirePermission } from "../middleware/auth.js";
+import { isExpenseCategory, updateCategoryBudget } from "../lib/mutations.js";
 import { fetchCategoryBudgets, fetchExpenses, fetchProjects } from "../lib/queries.js";
 import { getToday, isSameMonth, monthStart } from "../lib/time.js";
 import { formatRupiah, periodLabel } from "../lib/format.js";
@@ -105,4 +107,19 @@ budgetsRouter.get("/", async (_req, res) => {
     },
     budgetInsights,
   });
+});
+
+budgetsRouter.patch("/categories/:category", requirePermission("budgets.edit"), async (req, res) => {
+  const { category } = req.params;
+  const { plannedAmount } = req.body ?? {};
+  if (typeof category !== "string" || !isExpenseCategory(category)) {
+    res.status(400).json({ error: `Invalid category "${category}"` });
+    return;
+  }
+  if (typeof plannedAmount !== "number" || !Number.isFinite(plannedAmount) || plannedAmount < 0) {
+    res.status(400).json({ error: "plannedAmount must be a non-negative number" });
+    return;
+  }
+  await updateCategoryBudget(category, plannedAmount);
+  res.json({ ok: true });
 });
