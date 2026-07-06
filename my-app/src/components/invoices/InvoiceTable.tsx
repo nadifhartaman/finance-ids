@@ -11,8 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Chip, type ChipColor } from "@/components/ui/chip";
-import type { Invoice, InvoiceStatusKind } from "@/lib/mock-data";
-import { formatDate, formatRupiah, invoiceStatus } from "@/lib/mock-data";
+import type { Invoice, InvoiceStatusKind } from "@/lib/types";
+import { formatDate, formatRupiah } from "@/lib/format";
 
 const ROWS_PER_PAGE = 8;
 
@@ -21,12 +21,16 @@ const STATUS_FILTERS: { value: InvoiceStatusKind | "all"; label: string }[] = [
   { value: "paid", label: "Paid" },
   { value: "awaiting", label: "Waiting for payment" },
   { value: "overdue", label: "Overdue" },
+  { value: "partially-paid", label: "Partially paid" },
+  { value: "void", label: "Cancelled" },
 ];
 
 const STATUS_CHIP_COLOR: Record<InvoiceStatusKind, ChipColor> = {
   paid: "success",
   awaiting: "gray",
   overdue: "error",
+  "partially-paid": "warning",
+  void: "gray",
 };
 
 function downloadCsv(rows: Invoice[]) {
@@ -40,7 +44,7 @@ function downloadCsv(rows: Invoice[]) {
     "Due",
   ];
   const lines = rows.map((invoice) => {
-    const status = invoiceStatus(invoice);
+    const status = invoice.status;
     return [
       invoice.number,
       invoice.client,
@@ -58,7 +62,7 @@ function downloadCsv(rows: Invoice[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "invoices-june-2026.csv";
+  link.download = "invoices.csv";
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -87,7 +91,7 @@ export default function InvoiceTable({
         invoice.number.toLowerCase().includes(q) ||
         invoice.project.toLowerCase().includes(q);
       const matchesStatus =
-        statusFilter === "all" || invoiceStatus(invoice).kind === statusFilter;
+        statusFilter === "all" || invoice.status.kind === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [invoices, search, statusFilter]);
@@ -192,7 +196,7 @@ export default function InvoiceTable({
               </TableRow>
             ) : (
               pageRows.map((invoice) => {
-                const status = invoiceStatus(invoice);
+                const status = invoice.status;
                 return (
                   <TableRow key={invoice.id}>
                     <TableCell>

@@ -1,10 +1,11 @@
 import InvoiceSummaryCards from "@/components/invoices/InvoiceSummaryCards";
 import InvoiceTable from "@/components/invoices/InvoiceTable";
 import { getCurrentUser } from "@/lib/auth-mock";
-import { invoices } from "@/lib/mock-data";
+import { getInvoices } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function InvoicesPage() {
+  const { invoices, summary } = await getInvoices();
   const user = await getCurrentUser();
   return (
     <>
@@ -18,7 +19,7 @@ export default async function InvoicesPage() {
       </header>
 
       <div className="mt-6">
-        <InvoiceSummaryCards />
+        <InvoiceSummaryCards summary={summary} />
       </div>
 
       <div className="mt-4">
