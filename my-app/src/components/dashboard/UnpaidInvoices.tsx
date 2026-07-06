@@ -1,12 +1,12 @@
 import { Chip } from "@/components/ui/chip";
-import type { Invoice } from "@/lib/mock-data";
-import { formatRupiah, invoiceStatus } from "@/lib/mock-data";
+import type { DashboardUnpaidInvoice } from "@/lib/types";
+import { formatRupiah } from "@/lib/format";
 
-export default function UnpaidInvoices({ invoices }: { invoices: Invoice[] }) {
+export default function UnpaidInvoices({ invoices }: { invoices: DashboardUnpaidInvoice[] }) {
   return (
     <ul className="divide-y divide-card-border">
       {invoices.map((invoice) => {
-        const status = invoiceStatus(invoice);
+        const status = invoice.status;
         return (
           <li
             key={invoice.id}
@@ -19,7 +19,7 @@ export default function UnpaidInvoices({ invoices }: { invoices: Invoice[] }) {
               </Chip>
             </div>
             <p className="text-sm font-semibold text-title tabular-nums">
-              {formatRupiah(invoice.amount)}
+              {formatRupiah(invoice.outstanding)}
             </p>
           </li>
         );

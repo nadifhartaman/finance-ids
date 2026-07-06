@@ -1,6 +1,6 @@
 import { WalletIcon } from "@/components/shell/icons";
-import type { HeadlineStat } from "@/lib/mock-data";
-import { formatRupiah } from "@/lib/mock-data";
+import type { HeadlineStat } from "@/lib/types";
+import { formatRupiah } from "@/lib/format";
 
 const STATUS_LABEL: Record<HeadlineStat["status"], string> = {
   good: "Healthy",

@@ -6,18 +6,10 @@ import SectionCard from "@/components/ui/section-card";
 import StatCard from "@/components/dashboard/StatCard";
 import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
 import { Chip } from "@/components/ui/chip";
-import {
-  asOf,
-  attentionItems,
-  formatRupiah,
-  headlineStats,
-  period,
-  projectStats,
-  totalUnpaid,
-  unpaidInvoices,
-} from "@/lib/mock-data";
+import { getDashboard } from "@/lib/api";
 
-export default function Home() {
+export default async function Home() {
+  const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } = await getDashboard();
   const cash = headlineStats.find((s) => s.id === "cash")!;
   const kpis = headlineStats.filter((s) => s.id !== "cash");
 
@@ -32,9 +24,6 @@ export default function Home() {
             {period} · updated {asOf}
           </p>
         </div>
-        <Chip color="primary" dot={false}>
-          Layout preview — all numbers are dummy data
-        </Chip>
       </header>
 
       {/* The 3 headline numbers the Director reads first; cash is the hero */}
@@ -157,10 +146,6 @@ export default function Home() {
         </SectionCard>
       </div>
 
-      <footer className="mt-8 text-center text-xs text-ink-muted">
-        Every number on this page is placeholder data for layout review — no
-        real financial data is connected yet.
-      </footer>
     </>
   );
 }
