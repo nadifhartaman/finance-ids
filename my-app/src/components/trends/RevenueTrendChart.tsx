@@ -11,7 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatRupiah, type MonthlyRevenue } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/format";
+import type { MonthlyRevenue } from "@/lib/types";
 
 function compactRupiah(value: number): string {
   if (value === 0) return "Rp 0";

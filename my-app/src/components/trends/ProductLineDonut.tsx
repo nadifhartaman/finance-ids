@@ -1,7 +1,8 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-import { formatRupiah, type ProductLineRevenue } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/format";
+import type { TrendsResponse } from "@/lib/types";
 
 /** Ordinal purple ramp, darkest = largest slice (data already sorted desc). */
 const SLICE_COLORS = [
@@ -15,7 +16,7 @@ const SLICE_COLORS = [
 export default function ProductLineDonut({
   data,
 }: {
-  data: ProductLineRevenue[];
+  data: TrendsResponse["revenueByProductLine"];
 }) {
   const total = data.reduce((sum, d) => sum + d.amount, 0);
 
@@ -34,7 +35,7 @@ export default function ProductLineDonut({
               stroke="none"
             >
               {data.map((entry, index) => (
-                <Cell key={entry.productLine} fill={SLICE_COLORS[index]} />
+                <Cell key={entry.productLine} fill={SLICE_COLORS[index % SLICE_COLORS.length]} />
               ))}
             </Pie>
           </PieChart>
@@ -52,7 +53,7 @@ export default function ProductLineDonut({
               <span
                 aria-hidden
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: SLICE_COLORS[index] }}
+                style={{ backgroundColor: SLICE_COLORS[index % SLICE_COLORS.length] }}
               />
               {entry.productLine}
             </span>

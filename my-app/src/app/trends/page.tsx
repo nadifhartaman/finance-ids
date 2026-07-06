@@ -3,9 +3,18 @@ import ProductLineDonut from "@/components/trends/ProductLineDonut";
 import RevenueTrendChart from "@/components/trends/RevenueTrendChart";
 import TrendsSummaryCards from "@/components/trends/TrendsSummaryCards";
 import SectionCard from "@/components/ui/section-card";
-import { monthlyRevenue, revenueByClientType, revenueByProductLine } from "@/lib/mock-data";
+import { getTrends } from "@/lib/api";
 
-export default function TrendsPage() {
+export default async function TrendsPage() {
+  const {
+    monthlyRevenue,
+    revenueByClientType,
+    revenueByProductLine,
+    revenueThisYear,
+    yearTargetPct,
+    governmentSharePct,
+    topProductLine,
+  } = await getTrends();
   return (
     <>
       <header>
@@ -18,7 +27,12 @@ export default function TrendsPage() {
       </header>
 
       <div className="mt-6">
-        <TrendsSummaryCards />
+        <TrendsSummaryCards
+          revenueThisYear={revenueThisYear}
+          yearTargetPct={yearTargetPct}
+          governmentSharePct={governmentSharePct}
+          topProductLine={topProductLine}
+        />
       </div>
 
       <div className="mt-4">

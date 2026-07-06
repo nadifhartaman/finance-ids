@@ -10,13 +10,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatRupiah, type ClientTypeRevenue } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/format";
+import type { TrendsResponse } from "@/lib/types";
 
 /** Government vs Private — a single magnitude comparison, not identity, so one hue. */
 export default function ClientTypeChart({
   data,
 }: {
-  data: ClientTypeRevenue[];
+  data: TrendsResponse["revenueByClientType"];
 }) {
   return (
     <div className="h-48">
