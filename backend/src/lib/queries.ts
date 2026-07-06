@@ -87,6 +87,19 @@ export async function fetchProjects(): Promise<ProjectRow[]> {
   return data as unknown as ProjectRow[];
 }
 
+/** Lightweight single-project read for capturing "before" state ahead of a write — see mutations.ts. */
+export async function fetchProjectById(
+  id: string,
+): Promise<{ budget: number | null; is_flagged: boolean } | null> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("budget, is_flagged")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export interface ExpenseRow {
   category: ExpenseCategory;
   project_id: string | null;

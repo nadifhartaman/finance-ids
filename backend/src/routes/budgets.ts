@@ -120,6 +120,6 @@ budgetsRouter.patch("/categories/:category", requirePermission("budgets.edit"), 
     res.status(400).json({ error: "plannedAmount must be a non-negative number" });
     return;
   }
-  await updateCategoryBudget(category, plannedAmount);
+  await updateCategoryBudget(category, plannedAmount, req.user!.id);
   res.json({ ok: true });
 });

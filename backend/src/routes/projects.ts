@@ -23,7 +23,7 @@ projectsRouter.patch("/:id/flag", requirePermission("projects.flag"), async (req
     res.status(400).json({ error: "isFlagged must be a boolean" });
     return;
   }
-  await updateProjectFlag(id, isFlagged);
+  await updateProjectFlag(id, isFlagged, req.user!.id);
   res.json({ ok: true });
 });
 
@@ -42,6 +42,6 @@ projectsRouter.patch("/:id/budget", requirePermission("budgets.edit"), async (re
     res.status(400).json({ error: "budget must be a non-negative number" });
     return;
   }
-  await updateProjectBudget(id, budget);
+  await updateProjectBudget(id, budget, req.user!.id);
   res.json({ ok: true });
 });
