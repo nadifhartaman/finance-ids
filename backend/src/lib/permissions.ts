@@ -9,6 +9,12 @@
 
 export type Role = "superadmin" | "admin" | "director" | "member";
 
+export const VALID_ROLES: readonly Role[] = ["superadmin", "admin", "director", "member"];
+
+export function isRole(value: string): value is Role {
+  return (VALID_ROLES as readonly string[]).includes(value);
+}
+
 export type PermissionAction =
   | "invoices.write"
   | "spending.write"

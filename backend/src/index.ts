@@ -3,9 +3,10 @@ import express from "express";
 import { env } from "./lib/env.js";
 import { supabase } from "./lib/supabase.js";
 import { errorHandler } from "./middleware/error.js";
-import { requireAuth } from "./middleware/auth.js";
+import { requireAuth, requirePermission } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
+import { usersRouter } from "./routes/users.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { invoicesRouter } from "./routes/invoices.js";
@@ -32,6 +33,7 @@ app.get("/api/health/db", async (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/me", requireAuth, meRouter);
+app.use("/api/users", requireAuth, requirePermission("users.manage"), usersRouter);
 
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/invoices", requireAuth, invoicesRouter);
