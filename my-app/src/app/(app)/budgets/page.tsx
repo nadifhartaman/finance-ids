@@ -37,7 +37,7 @@ export default async function BudgetsPage() {
               Spending by category
             </h2>
             <div className="mt-3">
-              <BudgetList items={categoryBudgets} canEdit={canEdit} />
+              <BudgetList items={categoryBudgets} canEdit={canEdit} kind="category" />
             </div>
           </section>
 
@@ -46,7 +46,12 @@ export default async function BudgetsPage() {
               Project budgets
             </h2>
             <div className="mt-3">
-              <BudgetList items={projectBudgets} canEdit={canEdit} layout="grid" />
+              <BudgetList
+                items={projectBudgets}
+                canEdit={canEdit}
+                kind="project"
+                layout="grid"
+              />
             </div>
           </section>
         </div>

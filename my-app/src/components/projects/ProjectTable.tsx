@@ -71,7 +71,11 @@ export default function ProjectTable({
                 </TableCell>
                 {canFlag && (
                   <TableCell className="text-right">
-                    <FlagProjectButton projectName={project.name} />
+                    <FlagProjectButton
+                      projectId={project.id}
+                      projectName={project.name}
+                      initialFlagged={project.isFlagged}
+                    />
                   </TableCell>
                 )}
               </TableRow>

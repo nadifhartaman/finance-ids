@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogBody,
@@ -8,63 +9,58 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { BudgetItem, BudgetHealth, BudgetHealthKind } from "@/lib/types";
+import type { BudgetItem } from "@/lib/types";
 import { formatRupiah } from "@/lib/format";
+import { updateCategoryBudget, updateProjectBudgetAmount } from "@/lib/budgets-actions";
 import BudgetItemCard from "./BudgetItemCard";
 
 /**
  * Client island around BudgetItemCard: when the current role may edit
  * budgets, each card gets an "Edit budget" affordance opening a dialog.
- * Edits live in component state only (preview) until the backend API
- * exists to persist them.
+ * Persists via PATCH /api/budgets/categories/:category (kind="category")
+ * or PATCH /api/projects/:id/budget (kind="project"), then refreshes the
+ * page's server data so the health/chip/bar reflect the real recompute.
  */
 export default function BudgetList({
-  items: initialItems,
+  items,
   canEdit,
+  kind,
   layout = "stack",
 }: {
   items: BudgetItem[];
   canEdit: boolean;
+  kind: "category" | "project";
   layout?: "stack" | "grid";
 }) {
-  const [items, setItems] = useState(initialItems);
+  const router = useRouter();
   const [editing, setEditing] = useState<BudgetItem | null>(null);
   const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   function openEditor(item: BudgetItem) {
     setEditing(item);
     setDraft(String(item.budget));
-  }
-
-  // TODO: Remove this local recompute when real PATCH endpoint lands.
-  function recomputeHealth(budget: number, spent: number): BudgetHealth {
-    const remaining = budget - spent;
-    const pctUsed = budget === 0 ? 0 : Math.round((spent / budget) * 100);
-    let kind: BudgetHealthKind = "on-track";
-    let label = "On track";
-    if (remaining < 0) {
-      kind = "over";
-      label = "Over budget";
-    } else if (remaining < budget * 0.15) {
-      kind = "near-limit";
-      label = "Close to the limit";
-    }
-    return { kind, label, pctUsed, remaining };
+    setError(null);
   }
 
   function save(close: () => void) {
     const value = Number(draft);
-    if (editing && Number.isFinite(value) && value > 0) {
-      setItems((prev) =>
-        prev.map((i) => {
-          if (i.id === editing.id) {
-            return { ...i, budget: value, health: recomputeHealth(value, i.spent) };
-          }
-          return i;
-        })
-      );
-    }
-    close();
+    if (!editing || !Number.isFinite(value) || value <= 0) return;
+
+    startTransition(async () => {
+      const result =
+        kind === "category"
+          ? await updateCategoryBudget(editing.id.replace(/^cat-/, ""), value)
+          : await updateProjectBudgetAmount(editing.id, value);
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+      close();
+    });
   }
 
   return (
@@ -123,10 +119,11 @@ export default function BudgetList({
                   {formatRupiah(editing.spent)}
                 </p>
               )}
-              <p className="mt-3 rounded-lg bg-soft px-3 py-2 text-xs text-ink-secondary">
-                Preview only — changes are not saved yet and reset when the
-                page reloads. Saving for real arrives when write endpoints land.
-              </p>
+              {error && (
+                <p className="mt-3 rounded-lg bg-chip-error-bg px-3 py-2 text-xs text-chip-error-text">
+                  {error}
+                </p>
+              )}
             </DialogBody>
             <DialogFooter>
               <button
@@ -138,9 +135,10 @@ export default function BudgetList({
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                disabled={isPending}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
               >
-                Save change
+                {isPending ? "Saving…" : "Save change"}
               </button>
             </DialogFooter>
           </form>

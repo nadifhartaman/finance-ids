@@ -6,25 +6,10 @@
  * these actions being reachable only from a superadmin-gated dialog is UX,
  * not the security boundary.
  */
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { SESSION_COOKIE } from "./session-cookie";
+import { authedFetch } from "./authed-fetch";
 import type { Role } from "./roles";
 import type { UserListItem } from "./types";
-
-async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const apiUrl = process.env.API_URL ?? "http://localhost:4000";
-  return fetch(`${apiUrl}${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      ...(init?.headers ?? {}),
-      "content-type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    },
-  });
-}
 
 export async function listUsers(): Promise<UserListItem[]> {
   const res = await authedFetch("/api/users");
