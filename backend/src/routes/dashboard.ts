@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { spentByProject } from "../lib/aggregate.js";
+import { computeProjects, spentByProject } from "../lib/aggregate.js";
 import { invoiceStatus, outstanding } from "../lib/derive.js";
 import { asOfLabel, formatRupiah, periodLabel } from "../lib/format.js";
 import {
@@ -209,7 +209,7 @@ dashboardRouter.get("/", async (_req, res) => {
   );
 
   /* ── Top unpaid invoices for the "Money owed to us" card ── */
-  const unpaidInvoices = live
+  const allUnpaidInvoices = live
     .map((inv) => {
       const facts = {
         amount: inv.amount,
@@ -221,7 +221,11 @@ dashboardRouter.get("/", async (_req, res) => {
       return { inv, status: invoiceStatus(facts, today), outstanding: outstanding(facts) };
     })
     .filter(({ status }) => status.kind !== "paid")
-    .sort((a, b) => b.outstanding - a.outstanding)
+    .sort((a, b) => b.outstanding - a.outstanding);
+
+  const totalUnpaid = allUnpaidInvoices.reduce((s, { outstanding }) => s + outstanding, 0);
+
+  const unpaidInvoices = allUnpaidInvoices
     .slice(0, 4)
     .map(({ inv, status, outstanding }) => ({
       id: inv.id,
@@ -234,11 +238,15 @@ dashboardRouter.get("/", async (_req, res) => {
       status,
     }));
 
+  const projectStats = computeProjects(projectRows, invoiceRows, expenseRows).stats;
+
   res.json({
     asOf: asOfLabel(today),
     period: periodLabel(today),
     headlineStats,
     attentionItems,
+    totalUnpaid,
     unpaidInvoices,
+    projectStats,
   });
 });
