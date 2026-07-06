@@ -63,12 +63,20 @@ function downloadCsv(rows: Invoice[]) {
   URL.revokeObjectURL(url);
 }
 
-export default function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
+export default function InvoiceTable({
+  invoices,
+  canWrite = false,
+}: {
+  invoices: Invoice[];
+  /** Shows add/edit affordances; only passed for roles with `invoices.write`. */
+  canWrite?: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<InvoiceStatusKind | "all">(
     "all",
   );
   const [page, setPage] = useState(1);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -134,7 +142,33 @@ export default function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
         >
           Export CSV
         </button>
+        {canWrite && (
+          <button
+            type="button"
+            onClick={() =>
+              setNotice(
+                "Adding invoices arrives when the backend is connected — this preview shows who will see this button.",
+              )
+            }
+            className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            New invoice
+          </button>
+        )}
       </div>
+
+      {notice && (
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-lg bg-soft px-3 py-2 text-sm text-ink-secondary">
+          <p>{notice}</p>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 text-xs font-medium text-primary-700 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="mt-4">
         <TableRoot>
@@ -146,12 +180,13 @@ export default function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
               <TableHead>Status</TableHead>
               <TableHead>Issued</TableHead>
               <TableHead>Due</TableHead>
+              {canWrite && <TableHead className="sr-only">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center">
+                <TableCell colSpan={canWrite ? 7 : 6} className="py-8 text-center">
                   No invoices match your search.
                 </TableCell>
               </TableRow>
@@ -175,6 +210,21 @@ export default function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
                     </TableCell>
                     <TableCell>{formatDate(invoice.issuedDate)}</TableCell>
                     <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                    {canWrite && (
+                      <TableCell className="text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNotice(
+                              `Editing ${invoice.number} arrives when the backend is connected — this preview shows who will see this button.`,
+                            )
+                          }
+                          className="rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
+                        >
+                          Edit
+                        </button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })

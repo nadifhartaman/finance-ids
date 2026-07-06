@@ -14,7 +14,14 @@ const BAR_COLOR: Record<BudgetHealthKind, string> = {
   over: "bg-chip-error-icon",
 };
 
-export default function BudgetItemCard({ item }: { item: BudgetItem }) {
+export default function BudgetItemCard({
+  item,
+  onEdit,
+}: {
+  item: BudgetItem;
+  /** Renders an "Edit budget" affordance; only passed for roles with `budgets.edit`. */
+  onEdit?: () => void;
+}) {
   const health = budgetHealth(item);
   const barWidth = Math.min(health.pctUsed, 100);
 
@@ -27,7 +34,18 @@ export default function BudgetItemCard({ item }: { item: BudgetItem }) {
             <p className="text-xs text-ink-muted">{item.subtitle}</p>
           )}
         </div>
-        <Chip color={CHIP_COLOR[health.kind]}>{health.label}</Chip>
+        <div className="flex shrink-0 items-center gap-2">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
+            >
+              Edit budget
+            </button>
+          )}
+          <Chip color={CHIP_COLOR[health.kind]}>{health.label}</Chip>
+        </div>
       </div>
 
       <p className="mt-3 text-sm text-ink-secondary">

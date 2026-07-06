@@ -1,8 +1,11 @@
 import InvoiceSummaryCards from "@/components/invoices/InvoiceSummaryCards";
 import InvoiceTable from "@/components/invoices/InvoiceTable";
+import { getCurrentUser } from "@/lib/auth-mock";
 import { invoices } from "@/lib/mock-data";
+import { can } from "@/lib/roles";
 
-export default function InvoicesPage() {
+export default async function InvoicesPage() {
+  const user = await getCurrentUser();
   return (
     <>
       <header>
@@ -19,7 +22,10 @@ export default function InvoicesPage() {
       </div>
 
       <div className="mt-4">
-        <InvoiceTable invoices={invoices} />
+        <InvoiceTable
+          invoices={invoices}
+          canWrite={can(user.role, "invoices.write")}
+        />
       </div>
     </>
   );

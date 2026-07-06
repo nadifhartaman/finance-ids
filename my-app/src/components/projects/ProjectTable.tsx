@@ -9,6 +9,7 @@ import {
 import { Chip, type ChipColor } from "@/components/ui/chip";
 import type { Project, ProjectHealthKind } from "@/lib/mock-data";
 import { formatRupiah, projectHealth } from "@/lib/mock-data";
+import FlagProjectButton from "./FlagProjectButton";
 
 const STATUS_CHIP_COLOR: Record<ProjectHealthKind, ChipColor> = {
   "over-budget": "error",
@@ -16,7 +17,14 @@ const STATUS_CHIP_COLOR: Record<ProjectHealthKind, ChipColor> = {
   "on-schedule": "success",
 };
 
-export default function ProjectTable({ projects }: { projects: Project[] }) {
+export default function ProjectTable({
+  projects,
+  canFlag = false,
+}: {
+  projects: Project[];
+  /** Shows the flag-for-review affordance; only passed for roles with `projects.flag`. */
+  canFlag?: boolean;
+}) {
   return (
     <div className="rounded-2xl border border-card-border bg-card p-5 shadow-xs">
       <TableRoot>
@@ -27,6 +35,7 @@ export default function ProjectTable({ projects }: { projects: Project[] }) {
             <TableHead className="text-right">Contract value</TableHead>
             <TableHead>Billing progress</TableHead>
             <TableHead>Status</TableHead>
+            {canFlag && <TableHead className="sr-only">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -60,6 +69,11 @@ export default function ProjectTable({ projects }: { projects: Project[] }) {
                     {health.label}
                   </Chip>
                 </TableCell>
+                {canFlag && (
+                  <TableCell className="text-right">
+                    <FlagProjectButton projectName={project.name} />
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}

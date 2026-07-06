@@ -111,6 +111,25 @@ export function TrendingUpIcon(props: IconProps) {
   );
 }
 
+export function CheckIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m5 12 5 5L20 7" />
+    </Icon>
+  );
+}
+
+export function UsersIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <path d="M16 5.2a3.5 3.5 0 0 1 0 5.6" />
+      <path d="M17.5 14.6a6 6 0 0 1 3.5 5.4" />
+    </Icon>
+  );
+}
+
 export function ChartBarIcon(props: IconProps) {
   return (
     <Icon {...props}>

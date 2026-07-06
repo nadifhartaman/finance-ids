@@ -1,6 +1,8 @@
-import { BellIcon, ChevronDownIcon, SearchIcon } from "./icons";
+import type { AppUser } from "@/lib/roles";
+import { BellIcon, SearchIcon } from "./icons";
+import UserMenu from "./UserMenu";
 
-export default function Topbar() {
+export default function Topbar({ user }: { user: AppUser }) {
   return (
     <header className="flex items-center justify-between gap-4 border-b border-card-border bg-card px-4 py-3 sm:px-6">
       <label className="flex w-full max-w-md items-center gap-2.5 rounded-lg border border-card-border px-3 py-2 text-sm text-ink-muted focus-within:border-primary-300">
@@ -23,18 +25,7 @@ export default function Topbar() {
           <BellIcon className="size-5" />
           <span className="absolute top-1.5 right-2 size-2 rounded-full bg-chip-error-icon ring-2 ring-card" />
         </button>
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-lg py-1 pr-1 pl-1.5 hover:bg-soft"
-        >
-          <span className="flex size-8 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
-            D
-          </span>
-          <span className="hidden text-sm font-medium text-title sm:block">
-            Director
-          </span>
-          <ChevronDownIcon className="size-4 text-ink-muted" />
-        </button>
+        <UserMenu user={user} />
       </div>
     </header>
   );

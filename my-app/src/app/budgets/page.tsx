@@ -1,10 +1,14 @@
 import BudgetInsights from "@/components/budgets/BudgetInsights";
-import BudgetItemCard from "@/components/budgets/BudgetItemCard";
+import BudgetList from "@/components/budgets/BudgetList";
 import BudgetProgressRing from "@/components/budgets/BudgetProgressRing";
 import BudgetSummaryCards from "@/components/budgets/BudgetSummaryCards";
+import { getCurrentUser } from "@/lib/auth-mock";
 import { categoryBudgets, projectBudgets } from "@/lib/mock-data";
+import { can } from "@/lib/roles";
 
-export default function BudgetsPage() {
+export default async function BudgetsPage() {
+  const user = await getCurrentUser();
+  const canEdit = can(user.role, "budgets.edit");
   return (
     <>
       <header>
@@ -31,10 +35,8 @@ export default function BudgetsPage() {
             <h2 className="text-lg font-semibold text-title">
               Spending by category
             </h2>
-            <div className="mt-3 space-y-4">
-              {categoryBudgets.map((item) => (
-                <BudgetItemCard key={item.id} item={item} />
-              ))}
+            <div className="mt-3">
+              <BudgetList items={categoryBudgets} canEdit={canEdit} />
             </div>
           </section>
 
@@ -42,10 +44,8 @@ export default function BudgetsPage() {
             <h2 className="text-lg font-semibold text-title">
               Project budgets
             </h2>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              {projectBudgets.map((item) => (
-                <BudgetItemCard key={item.id} item={item} />
-              ))}
+            <div className="mt-3">
+              <BudgetList items={projectBudgets} canEdit={canEdit} layout="grid" />
             </div>
           </section>
         </div>

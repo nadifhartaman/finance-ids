@@ -1,8 +1,11 @@
 import ProjectSummaryCards from "@/components/projects/ProjectSummaryCards";
 import ProjectTable from "@/components/projects/ProjectTable";
+import { getCurrentUser } from "@/lib/auth-mock";
 import { projectsSorted } from "@/lib/mock-data";
+import { can } from "@/lib/roles";
 
-export default function ProjectsPage() {
+export default async function ProjectsPage() {
+  const user = await getCurrentUser();
   return (
     <>
       <header>
@@ -19,7 +22,10 @@ export default function ProjectsPage() {
       </div>
 
       <div className="mt-4">
-        <ProjectTable projects={projectsSorted} />
+        <ProjectTable
+          projects={projectsSorted}
+          canFlag={can(user.role, "projects.flag")}
+        />
       </div>
     </>
   );
