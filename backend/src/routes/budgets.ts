@@ -89,7 +89,7 @@ budgetsRouter.get("/", async (_req, res) => {
   }
   if (mostHeadroomCat && maxHeadroom > 0) {
     budgetInsights.push(
-      `${mostHeadroomCat} still has ${formatRupiah(maxHeadroom)} left to spend this month.`
+      `${formatRupiah(maxHeadroom)} still left to spend on ${mostHeadroomCat.toLowerCase()} this month.`
     );
   }
 
