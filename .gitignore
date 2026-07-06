@@ -1,7 +1,7 @@
 # Agent skills & config (local-only)
 /.agents/
 /skills-lock.json
-/CLAUDE.md
+CLAUDE.md
 /docs/agents/
 
 # Local issue tracker
@@ -16,3 +16,10 @@
 
 # logs
 *.log
+
+# Additional user ignores
+/reference/
+/architecture/
+/style guide/
+docs/
+my-app/docs/
