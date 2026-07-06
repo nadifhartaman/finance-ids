@@ -18,6 +18,10 @@ build/
 # test coverage
 coverage/
 
+# supabase CLI machine-local state (project link, caches) — not schema code;
+# migrations/ and seed.sql ARE committed
+supabase/.temp/
+
 # misc
 .DS_Store
 
