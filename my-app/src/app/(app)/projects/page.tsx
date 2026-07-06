@@ -1,12 +1,12 @@
 import ProjectSummaryCards from "@/components/projects/ProjectSummaryCards";
 import ProjectTable from "@/components/projects/ProjectTable";
-import { getCurrentUser } from "@/lib/auth-mock";
+import { getRequiredUser } from "@/lib/auth";
 import { getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function ProjectsPage() {
   const { projects, stats } = await getProjects();
-  const user = await getCurrentUser();
+  const user = await getRequiredUser();
   return (
     <>
       <header>

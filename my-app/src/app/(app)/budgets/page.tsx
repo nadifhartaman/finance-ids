@@ -2,12 +2,12 @@ import BudgetInsights from "@/components/budgets/BudgetInsights";
 import BudgetList from "@/components/budgets/BudgetList";
 import BudgetProgressRing from "@/components/budgets/BudgetProgressRing";
 import BudgetSummaryCards from "@/components/budgets/BudgetSummaryCards";
-import { getCurrentUser } from "@/lib/auth-mock";
+import { getRequiredUser } from "@/lib/auth";
 import { getBudgets } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function BudgetsPage() {
-  const user = await getCurrentUser();
+  const user = await getRequiredUser();
   const canEdit = can(user.role, "budgets.edit");
   const { categoryBudgets, projectBudgets, totals, budgetInsights } = await getBudgets();
   return (

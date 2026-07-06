@@ -1,12 +1,12 @@
 import InvoiceSummaryCards from "@/components/invoices/InvoiceSummaryCards";
 import InvoiceTable from "@/components/invoices/InvoiceTable";
-import { getCurrentUser } from "@/lib/auth-mock";
+import { getRequiredUser } from "@/lib/auth";
 import { getInvoices } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function InvoicesPage() {
   const { invoices, summary } = await getInvoices();
-  const user = await getCurrentUser();
+  const user = await getRequiredUser();
   return (
     <>
       <header>

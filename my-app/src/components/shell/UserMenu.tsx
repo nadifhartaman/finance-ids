@@ -1,29 +1,22 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuHeader,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown";
-import { setMockRole } from "@/lib/auth-mock-actions";
-import { can, mockUsers, roleLabels, type AppUser } from "@/lib/roles";
-import { CheckIcon, ChevronDownIcon, UsersIcon } from "./icons";
-import ManageUsersDialog from "./ManageUsersDialog";
+import { logout } from "@/lib/auth-actions";
+import { roleLabels, type AppUser } from "@/lib/roles";
+import { ChevronDownIcon, LogOutIcon } from "./icons";
 
 export default function UserMenu({ user }: { user: AppUser }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [manageOpen, setManageOpen] = useState(false);
 
-  function switchTo(role: AppUser["role"]) {
+  function signOut() {
     startTransition(async () => {
-      await setMockRole(role);
-      router.refresh();
+      await logout();
     });
   }
 
@@ -47,35 +40,12 @@ export default function UserMenu({ user }: { user: AppUser }) {
         </span>
         <ChevronDownIcon className="size-4 text-ink-muted" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent placement="bottom end" className="min-w-56">
-        <DropdownMenuHeader>View as (preview — no login yet)</DropdownMenuHeader>
-        {mockUsers.map((u) => (
-          <DropdownMenuItem key={u.id} onAction={() => switchTo(u.role)}>
-            <span className="flex size-7 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
-              {u.name.charAt(0)}
-            </span>
-            <span className="flex-1">
-              <span className="block font-medium text-title">{u.name}</span>
-              <span className="block text-xs text-ink-muted">
-                {roleLabels[u.role]} · {u.title}
-              </span>
-            </span>
-            {u.role === user.role && (
-              <CheckIcon className="size-4 text-primary-600" />
-            )}
-          </DropdownMenuItem>
-        ))}
-        {can(user.role, "users.manage") && (
-          <>
-            <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuItem onAction={() => setManageOpen(true)}>
-              <UsersIcon className="size-4 shrink-0 text-ink-muted" />
-              <span className="font-medium text-title">Manage users</span>
-            </DropdownMenuItem>
-          </>
-        )}
+      <DropdownMenuContent placement="bottom end" className="min-w-48">
+        <DropdownMenuItem onAction={signOut}>
+          <LogOutIcon className="size-4 shrink-0 text-ink-muted" />
+          <span className="font-medium text-title">Sign out</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
-      <ManageUsersDialog isOpen={manageOpen} onOpenChange={setManageOpen} />
     </DropdownMenu>
   );
 }
