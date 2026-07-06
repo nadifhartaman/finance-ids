@@ -151,7 +151,7 @@ export default function InvoiceTable({
             type="button"
             onClick={() =>
               setNotice(
-                "Adding invoices arrives when the backend is connected — this preview shows who will see this button.",
+                "Adding invoices arrives when real auth and write endpoints land — this preview shows who will see this button.",
               )
             }
             className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
@@ -220,7 +220,7 @@ export default function InvoiceTable({
                           type="button"
                           onClick={() =>
                             setNotice(
-                              `Editing ${invoice.number} arrives when the backend is connected — this preview shows who will see this button.`,
+                              `Editing ${invoice.number} arrives when real auth and write endpoints land — this preview shows who will see this button.`,
                             )
                           }
                           className="rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"

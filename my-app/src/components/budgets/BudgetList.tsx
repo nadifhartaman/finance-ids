@@ -125,7 +125,7 @@ export default function BudgetList({
               )}
               <p className="mt-3 rounded-lg bg-soft px-3 py-2 text-xs text-ink-secondary">
                 Preview only — changes are not saved yet and reset when the
-                page reloads. Saving for real arrives with the backend.
+                page reloads. Saving for real arrives when write endpoints land.
               </p>
             </DialogBody>
             <DialogFooter>

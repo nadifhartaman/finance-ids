@@ -1,5 +1,5 @@
 /**
- * ⚠️ MOCK auth — no real login yet, same convention as mock-data.ts.
+ * ⚠️ MOCK auth — no real login yet. (Data comes from api.ts)
  * The "current user" is whichever mock user the `mock-role` cookie points
  * at (switchable from the Topbar user menu). When the backend API exists,
  * replace this with a session read / `GET /me` fetch and delete this file;

@@ -7,6 +7,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
 import { Chip } from "@/components/ui/chip";
 import { getDashboard } from "@/lib/api";
+import { formatRupiah } from "@/lib/format";
 
 export default async function Home() {
   const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } = await getDashboard();

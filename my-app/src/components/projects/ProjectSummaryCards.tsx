@@ -12,19 +12,19 @@ export default function ProjectSummaryCards({ stats }: { stats: ProjectStats }) 
   const CARDS = [
     {
       label: "Active projects",
-      value: stats.active,
+      value: String(stats.active),
       Icon: BriefcaseIcon,
       iconClasses: "bg-primary-50 text-primary-500",
     },
     {
       label: "Close to billing",
-      value: stats.nearBilling,
+      value: String(stats.nearBilling),
       Icon: ReceiptIcon,
       iconClasses: "bg-chip-success-bg text-chip-success-icon",
     },
     {
       label: "Over budget",
-      value: stats.overBudget,
+      value: String(stats.overBudget),
       Icon: TrendingUpIcon,
       iconClasses: "bg-chip-error-bg text-chip-error-icon",
       note: stats.flaggedProject,

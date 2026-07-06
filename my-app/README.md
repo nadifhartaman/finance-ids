@@ -1,22 +1,15 @@
-# Indismart Internal Financial Dashboard
+# Indismart Internal Financial Dashboard (Frontend)
 
-Frontend for the Indismart Internal Financial Dashboard (finance-ids).
-Built with Next.js 16, React 19, and Tailwind CSS 4.
+Next.js 16 frontend for the Indismart financial dashboard.
 
-## Getting Started
+## Running locally
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+npm run dev
+```
 
-2. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-## Architecture
-
-See `docs/architecture.md` for details on data flow, components, and routing.
+### Backend connection
+This frontend requires the backend API to be running or a valid `API_URL` pointing to production.
+1. Start the Express server in the `backend/` directory on port 4000 for local development.
+2. The frontend connects to it using the `API_URL` specified in `.env.local` (which defaults to Railway production if set).
