@@ -7,8 +7,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Chip, type ChipColor } from "@/components/ui/chip";
-import type { Project, ProjectHealthKind } from "@/lib/mock-data";
-import { formatRupiah, projectHealth } from "@/lib/mock-data";
+import type { Project, ProjectHealthKind } from "@/lib/types";
+import { formatRupiah } from "@/lib/format";
 import FlagProjectButton from "./FlagProjectButton";
 
 const STATUS_CHIP_COLOR: Record<ProjectHealthKind, ChipColor> = {
@@ -40,7 +40,7 @@ export default function ProjectTable({
         </TableHeader>
         <TableBody>
           {projects.map((project) => {
-            const health = projectHealth(project);
+            const health = project.health;
             return (
               <TableRow key={project.id}>
                 <TableCell>

@@ -5,36 +5,38 @@ import {
   WalletIcon,
 } from "@/components/shell/icons";
 import { SummaryCard } from "@/components/ui/summary-card";
-import { formatRupiah, projectStats } from "@/lib/mock-data";
+import { formatRupiah } from "@/lib/format";
+import type { ProjectStats } from "@/lib/types";
 
-const CARDS = [
-  {
-    label: "Active projects",
-    value: String(projectStats.active),
-    Icon: BriefcaseIcon,
-    iconClasses: "bg-primary-50 text-primary-500",
-  },
-  {
-    label: "Close to billing",
-    value: String(projectStats.nearBilling),
-    Icon: ReceiptIcon,
-    iconClasses: "bg-chip-success-bg text-chip-success-icon",
-  },
-  {
-    label: "Over budget",
-    value: String(projectStats.overBudget),
-    Icon: TrendingUpIcon,
-    iconClasses: "bg-chip-error-bg text-chip-error-icon",
-  },
-  {
-    label: "Signed work not yet billed",
-    value: formatRupiah(projectStats.pipelineValue),
-    Icon: WalletIcon,
-    iconClasses: "bg-primary-50 text-primary-500",
-  },
-];
-
-export default function ProjectSummaryCards() {
+export default function ProjectSummaryCards({ stats }: { stats: ProjectStats }) {
+  const CARDS = [
+    {
+      label: "Active projects",
+      value: stats.active,
+      Icon: BriefcaseIcon,
+      iconClasses: "bg-primary-50 text-primary-500",
+    },
+    {
+      label: "Close to billing",
+      value: stats.nearBilling,
+      Icon: ReceiptIcon,
+      iconClasses: "bg-chip-success-bg text-chip-success-icon",
+    },
+    {
+      label: "Over budget",
+      value: stats.overBudget,
+      Icon: TrendingUpIcon,
+      iconClasses: "bg-chip-error-bg text-chip-error-icon",
+      note: stats.flaggedProject,
+    },
+    {
+      label: "Pipeline value",
+      value: formatRupiah(stats.pipelineValue),
+      Icon: WalletIcon,
+      iconClasses: "bg-primary-50 text-primary-500",
+      note: "Signed but not yet billed",
+    },
+  ];
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {CARDS.map((card) => (
