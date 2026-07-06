@@ -3,6 +3,7 @@ import { spentByProject } from "../lib/aggregate.js";
 import { budgetHealth } from "../lib/derive.js";
 import { fetchCategoryBudgets, fetchExpenses, fetchProjects } from "../lib/queries.js";
 import { getToday, isSameMonth, monthStart } from "../lib/time.js";
+import { formatRupiah, periodLabel } from "../lib/format.js";
 
 export const budgetsRouter = Router();
 
@@ -57,8 +58,43 @@ budgetsRouter.get("/", async (_req, res) => {
   const totalBudget = categoryBudgets.reduce((s, b) => s + b.budget, 0);
   const totalSpent = categoryBudgets.reduce((s, b) => s + b.spent, 0);
 
+  const budgetInsights: string[] = [];
+
+  for (const b of categoryBudgets) {
+    if (b.health.kind === "over") {
+      const over = b.spent - b.budget;
+      budgetInsights.push(
+        `${b.name} spent ${formatRupiah(over)} more than planned this month.`
+      );
+    }
+  }
+
+  for (const p of projectBudgets) {
+    if (p.health.kind === "over") {
+      const pctOver = Math.round((p.spent / p.budget - 1) * 100);
+      budgetInsights.push(
+        `${p.name} is ${pctOver}% over its project budget — see Needs attention on the Dashboard.`
+      );
+    }
+  }
+
+  let mostHeadroomCat = null;
+  let maxHeadroom = 0;
+  for (const b of categoryBudgets) {
+    const headroom = b.budget - b.spent;
+    if (headroom > maxHeadroom) {
+      maxHeadroom = headroom;
+      mostHeadroomCat = b.name;
+    }
+  }
+  if (mostHeadroomCat && maxHeadroom > 0) {
+    budgetInsights.push(
+      `${mostHeadroomCat} still has ${formatRupiah(maxHeadroom)} left to spend this month.`
+    );
+  }
+
   res.json({
-    period,
+    period: periodLabel(today),
     categoryBudgets,
     projectBudgets,
     totals: {
@@ -67,5 +103,6 @@ budgetsRouter.get("/", async (_req, res) => {
       remaining: totalBudget - totalSpent,
       pctUsed: totalBudget === 0 ? 0 : Math.round((totalSpent / totalBudget) * 100),
     },
+    budgetInsights,
   });
 });
