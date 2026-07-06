@@ -3,9 +3,11 @@ import { fetchProfileById } from "../lib/queries.js";
 import { can, type PermissionAction, type Role } from "../lib/permissions.js";
 import { supabaseAuth } from "../lib/supabase.js";
 
+// Matches the frontend's AppUser contract (my-app/src/lib/roles.ts) exactly —
+// this is what both /api/auth/login and /api/me hand back to the client.
 export interface AuthUser {
   id: string;
-  fullName: string;
+  name: string;
   role: Role;
 }
 
@@ -48,7 +50,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  req.user = { id: profile.id, fullName: profile.full_name, role: profile.role };
+  req.user = { id: profile.id, name: profile.full_name, role: profile.role };
   next();
 }
 
