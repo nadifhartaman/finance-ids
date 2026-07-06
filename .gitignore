@@ -17,6 +17,12 @@ CLAUDE.md
 # logs
 *.log
 
+# secrets safety net — every app dir also ignores its own .env, but this
+# guarantees no env file anywhere is ever committed
+.env
+.env.*
+!.env.example
+
 # Additional user ignores
 /reference/
 /architecture/
