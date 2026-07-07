@@ -7,7 +7,7 @@
  * not the security boundary.
  */
 import { revalidatePath } from "next/cache";
-import { authedFetch } from "./authed-fetch";
+import { authedFetch, patchAction } from "./authed-fetch";
 import type { Role } from "./roles";
 import type { UserListItem } from "./types";
 
@@ -55,28 +55,12 @@ export async function inviteUser(_prevState: InviteState, formData: FormData): P
 }
 
 export async function updateUserRole(id: string, role: Role): Promise<{ error: string | null }> {
-  const res = await authedFetch(`/api/users/${id}/role`, {
-    method: "PATCH",
-    body: JSON.stringify({ role }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    return { error: body?.error ?? "Failed to update role." };
-  }
-  return { error: null };
+  return patchAction(`/api/users/${id}/role`, { role }, [], "Failed to update role.");
 }
 
 export async function updateUserActive(
   id: string,
   isActive: boolean,
 ): Promise<{ error: string | null }> {
-  const res = await authedFetch(`/api/users/${id}/active`, {
-    method: "PATCH",
-    body: JSON.stringify({ isActive }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    return { error: body?.error ?? "Failed to update account status." };
-  }
-  return { error: null };
+  return patchAction(`/api/users/${id}/active`, { isActive }, [], "Failed to update account status.");
 }
