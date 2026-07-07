@@ -18,19 +18,20 @@ export async function authedFetch(path: string, init?: RequestInit): Promise<Res
 }
 
 /**
- * Shared shape for the simple "PATCH an id, return {error}" mutations —
- * factored out after the same pattern showed up in 5 different action files.
- * Callers invoke this from inside a "use server" function; only the entry
- * point needs the directive, not this helper.
+ * Shared shape for the simple "PATCH/DELETE an id, return {error}" mutations
+ * — factored out after the same pattern showed up in 5 different action
+ * files. Callers invoke this from inside a "use server" function; only the
+ * entry point needs the directive, not this helper.
  */
 export async function patchAction(
   path: string,
   body: unknown,
   revalidatePaths: string[],
   fallbackError = "Something went wrong.",
+  method: "PATCH" | "DELETE" = "PATCH",
 ): Promise<{ error: string | null }> {
   const res = await authedFetch(path, {
-    method: "PATCH",
+    method,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {

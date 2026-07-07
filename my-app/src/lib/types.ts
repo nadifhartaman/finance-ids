@@ -197,3 +197,15 @@ export interface ProjectOption {
   name: string;
   client: string;
 }
+
+export type ClientType = "government" | "private";
+
+export interface ClientOption {
+  id: string;
+  name: string;
+  clientType: ClientType;
+}
+
+export interface ClientsResponse {
+  clients: ClientOption[];
+}

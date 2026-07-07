@@ -1,11 +1,16 @@
 import ProjectSummaryCards from "@/components/projects/ProjectSummaryCards";
 import ProjectTable from "@/components/projects/ProjectTable";
 import { getRequiredUser } from "@/lib/auth";
-import { getProjects } from "@/lib/api";
+import { getClients, getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function ProjectsPage() {
-  const [{ projects, stats }, user] = await Promise.all([getProjects(), getRequiredUser()]);
+  const [{ projects, stats }, user, { clients }] = await Promise.all([
+    getProjects(),
+    getRequiredUser(),
+    getClients(),
+  ]);
+  const canWrite = can(user.role, "projects.write");
   return (
     <>
       <header>
@@ -25,6 +30,8 @@ export default async function ProjectsPage() {
         <ProjectTable
           projects={projects}
           canFlag={can(user.role, "projects.flag")}
+          canWrite={canWrite}
+          clients={canWrite ? clients : []}
         />
       </div>
     </>

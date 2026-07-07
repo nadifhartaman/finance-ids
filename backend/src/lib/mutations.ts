@@ -15,11 +15,31 @@ import { logAudit } from "./audit.js";
 import type { Database } from "../types/database.js";
 
 export type ExpenseCategory = Database["public"]["Enums"]["expense_category"];
+export type ProductLine = Database["public"]["Enums"]["product_line"];
+export type ClientType = Database["public"]["Enums"]["client_type"];
 
 const VALID_CATEGORIES: readonly ExpenseCategory[] = ["payroll", "operations", "project_costs"];
 
 export function isExpenseCategory(value: string): value is ExpenseCategory {
   return (VALID_CATEGORIES as readonly string[]).includes(value);
+}
+
+export const VALID_PRODUCT_LINES: readonly ProductLine[] = [
+  "VIANA",
+  "ORION",
+  "AIoT",
+  "Indi AI",
+  "3D Digital Twin",
+];
+
+export function isProductLine(value: string): value is ProductLine {
+  return (VALID_PRODUCT_LINES as readonly string[]).includes(value);
+}
+
+const VALID_CLIENT_TYPES: readonly ClientType[] = ["government", "private"];
+
+export function isClientType(value: string): value is ClientType {
+  return (VALID_CLIENT_TYPES as readonly string[]).includes(value);
 }
 
 export async function updateProjectFlag(
@@ -194,6 +214,117 @@ export async function voidInvoice(id: string, actorId: string): Promise<void> {
     entityId: id,
     before: before ? { voidedAt: before.voided_at } : null,
     after: { voidedAt },
+  });
+}
+
+export async function createClient(name: string, clientType: ClientType): Promise<{ id: string }> {
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({ name, client_type: clientType })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return { id: data.id };
+}
+
+export interface CreateProjectInput {
+  clientId?: string;
+  newClient?: { name: string; clientType: ClientType };
+  name: string;
+  productLine: ProductLine;
+  contractValue: number;
+  budget: number | null;
+}
+
+export async function createProject(
+  input: CreateProjectInput,
+  actorId: string,
+): Promise<{ id: string }> {
+  let clientId = input.clientId;
+  if (input.newClient) {
+    const client = await createClient(input.newClient.name, input.newClient.clientType);
+    clientId = client.id;
+  }
+  if (!clientId) throw new Error("clientId or newClient is required");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      client_id: clientId,
+      name: input.name,
+      product_line: input.productLine,
+      contract_value: input.contractValue,
+      budget: input.budget,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "create",
+    entity: "project",
+    entityId: data.id,
+    before: null,
+    after: {
+      clientId,
+      newClient: input.newClient ?? null,
+      name: input.name,
+      productLine: input.productLine,
+      contractValue: input.contractValue,
+      budget: input.budget,
+    },
+  });
+  return { id: data.id };
+}
+
+export interface UpdateProjectInput {
+  name: string;
+  productLine: ProductLine;
+  contractValue: number;
+}
+
+export async function updateProject(
+  id: string,
+  input: UpdateProjectInput,
+  actorId: string,
+): Promise<void> {
+  const before = await fetchProjectById(id);
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      name: input.name,
+      product_line: input.productLine,
+      contract_value: input.contractValue,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "update",
+    entity: "project",
+    entityId: id,
+    before: before
+      ? { name: before.name, productLine: before.product_line, contractValue: before.contract_value }
+      : null,
+    after: { name: input.name, productLine: input.productLine, contractValue: input.contractValue },
+  });
+}
+
+/** Caller must already have verified via projectHasFinancialHistory — the DB's ON DELETE RESTRICT is the backstop. */
+export async function deleteProject(id: string, actorId: string): Promise<void> {
+  const before = await fetchProjectById(id);
+  const { error } = await supabase.from("projects").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "delete",
+    entity: "project",
+    entityId: id,
+    before: before ? { name: before.name, contractValue: before.contract_value } : null,
+    after: null,
   });
 }
 

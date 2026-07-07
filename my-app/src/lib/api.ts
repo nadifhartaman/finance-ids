@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "./session-cookie";
 import {
   BudgetsResponse,
+  ClientsResponse,
   DashboardResponse,
   InvoicesResponse,
   NotesResponse,
@@ -35,6 +36,10 @@ export function getInvoices(): Promise<InvoicesResponse> {
 
 export function getProjects(): Promise<ProjectsResponse> {
   return getJson<ProjectsResponse>("/api/projects");
+}
+
+export function getClients(): Promise<ClientsResponse> {
+  return getJson<ClientsResponse>("/api/clients");
 }
 
 /** `scope`: omit for this month, "all" for all time, or "YYYY-MM-01" for a past month. */

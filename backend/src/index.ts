@@ -9,6 +9,7 @@ import { meRouter } from "./routes/me.js";
 import { usersRouter } from "./routes/users.js";
 import { notesRouter } from "./routes/notes.js";
 import { budgetsRouter } from "./routes/budgets.js";
+import { clientsRouter } from "./routes/clients.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { invoicesRouter } from "./routes/invoices.js";
 import { projectsRouter } from "./routes/projects.js";
@@ -40,6 +41,7 @@ app.use("/api/notes", requireAuth, notesRouter);
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/invoices", requireAuth, invoicesRouter);
 app.use("/api/projects", requireAuth, projectsRouter);
+app.use("/api/clients", requireAuth, clientsRouter);
 app.use("/api/budgets", requireAuth, budgetsRouter);
 app.use("/api/trends", requireAuth, trendsRouter);
 

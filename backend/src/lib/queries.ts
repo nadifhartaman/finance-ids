@@ -85,6 +85,21 @@ export async function fetchInvoiceById(id: string): Promise<InvoiceFactsRow | nu
   return data;
 }
 
+export interface ClientRow {
+  id: string;
+  name: string;
+  client_type: ClientType;
+}
+
+export async function fetchClients(): Promise<ClientRow[]> {
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, name, client_type")
+    .order("name");
+  if (error) throw error;
+  return data;
+}
+
 export interface ProjectRow {
   id: string;
   name: string;
@@ -108,16 +123,32 @@ export async function fetchProjects(): Promise<ProjectRow[]> {
 }
 
 /** Lightweight single-project read for capturing "before" state ahead of a write — see mutations.ts. */
-export async function fetchProjectById(
-  id: string,
-): Promise<{ budget: number | null; is_flagged: boolean } | null> {
+export async function fetchProjectById(id: string): Promise<{
+  name: string;
+  product_line: string;
+  contract_value: number;
+  budget: number | null;
+  is_flagged: boolean;
+} | null> {
   const { data, error } = await supabase
     .from("projects")
-    .select("budget, is_flagged")
+    .select("name, product_line, contract_value, budget, is_flagged")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+/** True if this project has any invoice or expense recorded — financial facts that block a delete. */
+export async function projectHasFinancialHistory(id: string): Promise<boolean> {
+  const [{ count: invoiceCount, error: invoiceError }, { count: expenseCount, error: expenseError }] =
+    await Promise.all([
+      supabase.from("invoices").select("id", { count: "exact", head: true }).eq("project_id", id),
+      supabase.from("expenses").select("id", { count: "exact", head: true }).eq("project_id", id),
+    ]);
+  if (invoiceError) throw invoiceError;
+  if (expenseError) throw expenseError;
+  return (invoiceCount ?? 0) > 0 || (expenseCount ?? 0) > 0;
 }
 
 export interface ExpenseRow {
