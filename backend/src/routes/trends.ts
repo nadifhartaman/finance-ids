@@ -1,11 +1,15 @@
 import { Router } from "express";
+import { requirePermission } from "../middleware/auth.js";
+import { updateRevenueTarget } from "../lib/mutations.js";
 import { fetchInvoices, fetchRevenueTargets } from "../lib/queries.js";
+import { getToday, monthStart } from "../lib/time.js";
 
 export const trendsRouter = Router();
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 trendsRouter.get("/", async (_req, res) => {
+  const today = getToday();
   const [invoiceRows, targetRows] = await Promise.all([
     fetchInvoices(),
     fetchRevenueTargets(),
@@ -57,6 +61,8 @@ trendsRouter.get("/", async (_req, res) => {
   const totalRevenue = revenueByClientType.reduce((s, c) => s + c.amount, 0);
   const government = revenueByClientType[0]?.amount ?? 0;
 
+  const currentPeriod = monthStart(today);
+
   res.json({
     monthlyRevenue,
     revenueByProductLine,
@@ -66,5 +72,22 @@ trendsRouter.get("/", async (_req, res) => {
     governmentSharePct:
       totalRevenue === 0 ? 0 : Math.round((government / totalRevenue) * 100),
     topProductLine: revenueByProductLine[0]?.productLine ?? "",
+    currentPeriod,
+    currentTarget: targetRows.find((t) => t.period === currentPeriod)?.target_amount ?? 0,
   });
+});
+
+trendsRouter.patch("/targets/:period", requirePermission("targets.edit"), async (req, res) => {
+  const { period } = req.params;
+  const { targetAmount } = req.body ?? {};
+  if (typeof period !== "string" || !/^\d{4}-\d{2}-01$/.test(period)) {
+    res.status(400).json({ error: "period must be YYYY-MM-01" });
+    return;
+  }
+  if (typeof targetAmount !== "number" || !Number.isFinite(targetAmount) || targetAmount < 0) {
+    res.status(400).json({ error: "targetAmount must be a non-negative number" });
+    return;
+  }
+  await updateRevenueTarget(period, targetAmount, req.user!.id);
+  res.json({ ok: true });
 });

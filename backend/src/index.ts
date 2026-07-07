@@ -7,6 +7,7 @@ import { requireAuth, requirePermission } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
 import { usersRouter } from "./routes/users.js";
+import { notesRouter } from "./routes/notes.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { invoicesRouter } from "./routes/invoices.js";
@@ -34,6 +35,7 @@ app.get("/api/health/db", async (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/me", requireAuth, meRouter);
 app.use("/api/users", requireAuth, requirePermission("users.manage"), usersRouter);
+app.use("/api/notes", requireAuth, notesRouter);
 
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/invoices", requireAuth, invoicesRouter);

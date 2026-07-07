@@ -65,6 +65,26 @@ export async function fetchInvoices(): Promise<InvoiceRow[]> {
   return data as unknown as InvoiceRow[];
 }
 
+export interface InvoiceFactsRow {
+  amount: number;
+  amount_paid: number;
+  issued_date: string;
+  due_date: string;
+  paid_date: string | null;
+  voided_at: string | null;
+}
+
+/** Lightweight single-invoice read for capturing "before" state ahead of a write — see mutations.ts. */
+export async function fetchInvoiceById(id: string): Promise<InvoiceFactsRow | null> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("amount, amount_paid, issued_date, due_date, paid_date, voided_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export interface ProjectRow {
   id: string;
   name: string;
@@ -158,4 +178,25 @@ export async function fetchCashSnapshots(limit = 2): Promise<CashSnapshotRow[]> 
     .limit(limit);
   if (error) throw error;
   return data;
+}
+
+export interface PageNote {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+}
+
+/** Dashboard-only notes (entity="page", entity_id null) — no per-page scoping yet. */
+export async function fetchPageNotes(): Promise<PageNote[]> {
+  const { data, error } = await supabase
+    .from("notes")
+    .select("id, body, created_at, author:profiles!inner(full_name)")
+    .eq("entity", "page")
+    .is("entity_id", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as unknown as { id: string; body: string; created_at: string; author: { full_name: string } }[]).map(
+    (n) => ({ id: n.id, body: n.body, authorName: n.author.full_name, createdAt: n.created_at }),
+  );
 }
