@@ -37,8 +37,10 @@ export function getProjects(): Promise<ProjectsResponse> {
   return getJson<ProjectsResponse>("/api/projects");
 }
 
-export function getBudgets(): Promise<BudgetsResponse> {
-  return getJson<BudgetsResponse>("/api/budgets");
+/** `scope`: omit for this month, "all" for all time, or "YYYY-MM-01" for a past month. */
+export function getBudgets(scope?: string): Promise<BudgetsResponse> {
+  const query = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+  return getJson<BudgetsResponse>(`/api/budgets${query}`);
 }
 
 export function getTrends(): Promise<TrendsResponse> {

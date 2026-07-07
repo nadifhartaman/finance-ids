@@ -1,5 +1,5 @@
 import { formatRupiah } from "@/lib/format";
-import type { BudgetTotals } from "@/lib/types";
+import type { BudgetScope, BudgetTotals } from "@/lib/types";
 
 const SIZE = 160;
 const STROKE = 16;
@@ -7,17 +7,49 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /** Fundex donut, as a pure-SVG progress ring — no chart library needed. */
-export default function BudgetProgressRing({ totals }: { totals: BudgetTotals }) {
+export default function BudgetProgressRing({
+  totals,
+  scope,
+}: {
+  totals: BudgetTotals;
+  scope: BudgetScope;
+}) {
+  const isAll = scope.kind === "all";
+  const title = isAll
+    ? "Project budgets used"
+    : scope.isCurrent
+      ? "This month's budget"
+      : `Budget for ${scope.label}`;
+  const subtitle = isAll
+    ? "Whole-project budgets vs. everything those projects have spent."
+    : "Payroll, operations, and project costs added together.";
+
+  // A month can have spending without any plan set — nothing to compare.
+  if (totals.budget === 0) {
+    return (
+      <section className="rounded-2xl border border-card-border bg-card p-5 shadow-xs">
+        <h2 className="text-lg font-semibold text-title">{title}</h2>
+        <p className="mt-0.5 text-sm text-ink-secondary">{subtitle}</p>
+        <p className="mt-5 rounded-xl bg-soft p-4 text-sm text-ink-secondary">
+          No plan was set for {scope.label}, so there is nothing to compare
+          spending against. Total spent:{" "}
+          <span className="font-semibold text-title">
+            {formatRupiah(totals.spent)}
+          </span>
+          .
+        </p>
+      </section>
+    );
+  }
+
   const isOver = totals.pctUsed > 100;
   const fillFraction = Math.min(totals.pctUsed, 100) / 100;
   const dashOffset = CIRCUMFERENCE * (1 - fillFraction);
 
   return (
     <section className="rounded-2xl border border-card-border bg-card p-5 shadow-xs">
-      <h2 className="text-lg font-semibold text-title">This month&rsquo;s budget</h2>
-      <p className="mt-0.5 text-sm text-ink-secondary">
-        Are we spending more or less than planned?
-      </p>
+      <h2 className="text-lg font-semibold text-title">{title}</h2>
+      <p className="mt-0.5 text-sm text-ink-secondary">{subtitle}</p>
 
       <div className="mt-5 flex justify-center">
         <svg
@@ -25,7 +57,7 @@ export default function BudgetProgressRing({ totals }: { totals: BudgetTotals })
           height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           role="img"
-          aria-label={`${totals.pctUsed}% of this month's budget used`}
+          aria-label={`${totals.pctUsed}% of the budget used`}
         >
           <circle
             cx={SIZE / 2}

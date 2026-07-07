@@ -1,10 +1,15 @@
 import { Router } from "express";
 import { spentByProject } from "../lib/aggregate.js";
-import { budgetHealth } from "../lib/derive.js";
+import { budgetHealth, type BudgetHealth } from "../lib/derive.js";
 import { requirePermission } from "../middleware/auth.js";
-import { isExpenseCategory, updateCategoryBudget } from "../lib/mutations.js";
-import { fetchCategoryBudgets, fetchExpenses, fetchProjects } from "../lib/queries.js";
-import { getToday, isSameMonth, monthStart } from "../lib/time.js";
+import { isExpenseCategory, updateCategoryBudget, type ExpenseCategory } from "../lib/mutations.js";
+import {
+  fetchCategoryBudgetPeriods,
+  fetchCategoryBudgets,
+  fetchExpenses,
+  fetchProjects,
+} from "../lib/queries.js";
+import { getToday, monthStart } from "../lib/time.js";
 import { formatRupiah, periodLabel } from "../lib/format.js";
 
 export const budgetsRouter = Router();
@@ -15,108 +20,205 @@ const CATEGORY_LABELS = {
   project_costs: "Project costs",
 } as const;
 
-budgetsRouter.get("/", async (_req, res) => {
-  const today = getToday();
-  const period = monthStart(today);
+interface BudgetItem {
+  id: string;
+  name: string;
+  subtitle?: string;
+  budget: number | null;
+  spent: number;
+  health: BudgetHealth | null;
+}
 
-  const [budgetRows, expenseRows, projectRows] = await Promise.all([
-    fetchCategoryBudgets(period),
+/** "June 2026" from a YYYY-MM-01 period string (pure date-math, not "today"). */
+function periodStringLabel(period: string): string {
+  return periodLabel(new Date(`${period}T00:00:00Z`));
+}
+
+function sumTotals(items: BudgetItem[]) {
+  // Only items that have a plan count toward "budget"; spend always counts.
+  const budget = items.reduce((s, b) => s + (b.budget ?? 0), 0);
+  const spent = items.reduce((s, b) => s + b.spent, 0);
+  return {
+    budget,
+    spent,
+    remaining: budget - spent,
+    pctUsed: budget === 0 ? 0 : Math.round((spent / budget) * 100),
+  };
+}
+
+budgetsRouter.get("/", async (req, res) => {
+  const today = getToday();
+  const currentPeriod = monthStart(today);
+
+  const scopeParam = req.query.scope;
+  let scopeKind: "month" | "all";
+  let period: string | null;
+  if (scopeParam === undefined || scopeParam === "") {
+    scopeKind = "month";
+    period = currentPeriod;
+  } else if (scopeParam === "all") {
+    scopeKind = "all";
+    period = null;
+  } else if (typeof scopeParam === "string" && /^\d{4}-(0[1-9]|1[0-2])-01$/.test(scopeParam)) {
+    scopeKind = "month";
+    period = scopeParam;
+  } else {
+    res.status(400).json({ error: 'scope must be "all" or a month like 2026-06-01' });
+    return;
+  }
+
+  const [budgetRows, expenseRows, projectRows, budgetPeriods] = await Promise.all([
+    fetchCategoryBudgets(period ?? currentPeriod),
     fetchExpenses(),
     fetchProjects(),
+    fetchCategoryBudgetPeriods(),
   ]);
 
-  const monthExpenses = expenseRows.filter((e) => isSameMonth(e.spent_on, today));
+  // Months the select can switch to: any month with spending or a plan,
+  // excluding the current month (it gets its own "This month" option).
+  const monthSet = new Set<string>(budgetPeriods);
+  for (const e of expenseRows) monthSet.add(`${e.spent_on.slice(0, 7)}-01`);
+  monthSet.delete(currentPeriod);
+  const availableMonths = [...monthSet]
+    .sort()
+    .reverse()
+    .map((p) => ({ period: p, label: periodStringLabel(p) }));
 
-  const categoryBudgets = budgetRows.map((b) => {
-    const spent = monthExpenses
-      .filter((e) => e.category === b.category)
-      .reduce((s, e) => s + e.amount, 0);
-    return {
-      id: `cat-${b.category}`,
-      name: CATEGORY_LABELS[b.category],
-      budget: b.planned_amount,
-      spent,
-      health: budgetHealth(b.planned_amount, spent),
-    };
-  });
+  const isCurrent = period === currentPeriod;
+  const scope = {
+    kind: scopeKind,
+    period,
+    label: scopeKind === "all" ? "All time" : periodStringLabel(period as string),
+    isCurrent,
+  };
 
-  // Project budgets compare against CUMULATIVE spend (a project budget caps
-  // the whole project, not one month) — same rule as the mock.
-  const allTimeSpent = spentByProject(expenseRows);
-  const projectBudgets = projectRows
-    .filter((p) => p.budget !== null)
-    .map((p) => {
-      const spent = allTimeSpent.get(p.id) ?? 0;
+  const allTimeProjectSpent = spentByProject(expenseRows);
+  const budgetInsights: string[] = [];
+  let categoryBudgets: BudgetItem[];
+  let projectBudgets: BudgetItem[];
+  let totals;
+  let projectNote: string;
+
+  if (scopeKind === "month") {
+    const monthExpenses = expenseRows.filter(
+      (e) => e.spent_on.slice(0, 7) === (period as string).slice(0, 7),
+    );
+
+    // All 3 categories, whether or not a plan row exists for this month —
+    // spend is still worth showing, the card just says "no plan set".
+    categoryBudgets = (Object.keys(CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => {
+      const plan = budgetRows.find((b) => b.category === cat) ?? null;
+      const spent = monthExpenses
+        .filter((e) => e.category === cat)
+        .reduce((s, e) => s + e.amount, 0);
       return {
-        id: p.id,
-        name: p.name,
-        subtitle: p.client.name,
-        budget: p.budget as number,
+        id: `cat-${cat}`,
+        name: CATEGORY_LABELS[cat],
+        budget: plan?.planned_amount ?? null,
         spent,
-        health: budgetHealth(p.budget as number, spent),
+        health: plan ? budgetHealth(plan.planned_amount, spent) : null,
       };
     });
 
-  // Monthly-only: project budgets are lifetime caps on the same
-  // project_costs expenses already summed in categoryBudgets, so adding
-  // them here would double-count that money. See projectTotals below for
-  // the project-budgets summary instead.
-  const totalBudget = categoryBudgets.reduce((s, b) => s + b.budget, 0);
-  const totalSpent = categoryBudgets.reduce((s, b) => s + b.spent, 0);
+    // Per-project spend inside this one month. No health: project budgets cap
+    // the whole project, so a single month has nothing to compare against.
+    const monthProjectSpent = spentByProject(monthExpenses);
+    projectBudgets = projectRows
+      .filter((p) => (monthProjectSpent.get(p.id) ?? 0) > 0)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        subtitle: p.client.name,
+        budget: null,
+        spent: monthProjectSpent.get(p.id) as number,
+        health: null,
+      }))
+      .sort((a, b) => b.spent - a.spent);
 
-  const projectTotals = {
-    budget: projectBudgets.reduce((s, b) => s + b.budget, 0),
-    spent: projectBudgets.reduce((s, b) => s + b.spent, 0),
-    count: projectBudgets.length,
-    overCount: projectBudgets.filter((p) => p.health.kind === "over").length,
-  };
+    totals = sumTotals(categoryBudgets);
 
-  const budgetInsights: string[] = [];
-
-  for (const b of categoryBudgets) {
-    if (b.health.kind === "over") {
-      const over = b.spent - b.budget;
-      budgetInsights.push(
-        `${b.name} spent ${formatRupiah(over)} more than planned this month.`
-      );
+    const inMonth = isCurrent ? "this month" : `in ${scope.label}`;
+    for (const b of categoryBudgets) {
+      if (b.health?.kind === "over") {
+        budgetInsights.push(
+          `${b.name} spent ${formatRupiah(b.spent - (b.budget as number))} more than planned ${inMonth}.`
+        );
+      }
     }
-  }
-
-  for (const p of projectBudgets) {
-    if (p.health.kind === "over") {
-      const pctOver = Math.round((p.spent / p.budget - 1) * 100);
-      budgetInsights.push(
-        `${p.name} is ${pctOver}% over its project budget — see Needs attention on the Dashboard.`
-      );
+    if (isCurrent) {
+      let mostHeadroomCat = null;
+      let maxHeadroom = 0;
+      for (const b of categoryBudgets) {
+        const headroom = (b.budget ?? 0) - b.spent;
+        if (headroom > maxHeadroom) {
+          maxHeadroom = headroom;
+          mostHeadroomCat = b.name;
+        }
+      }
+      if (mostHeadroomCat && maxHeadroom > 0) {
+        budgetInsights.push(
+          `${formatRupiah(maxHeadroom)} still left to spend on ${mostHeadroomCat.toLowerCase()} this month.`
+        );
+      }
     }
-  }
 
-  let mostHeadroomCat = null;
-  let maxHeadroom = 0;
-  for (const b of categoryBudgets) {
-    const headroom = b.budget - b.spent;
-    if (headroom > maxHeadroom) {
-      maxHeadroom = headroom;
-      mostHeadroomCat = b.name;
+    const monthProjectTotal = projectBudgets.reduce((s, p) => s + p.spent, 0);
+    projectNote =
+      projectBudgets.length === 0
+        ? `No project spending recorded ${inMonth}.`
+        : `Projects spent ${formatRupiah(monthProjectTotal)} ${inMonth}. Project budgets cover the whole project — switch to "All time" to compare against them.`;
+  } else {
+    // All time: spend per category with no plan to compare (plans are
+    // monthly), and project budgets vs cumulative spend — their home view.
+    categoryBudgets = (Object.keys(CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => ({
+      id: `cat-${cat}`,
+      name: CATEGORY_LABELS[cat],
+      budget: null,
+      spent: expenseRows
+        .filter((e) => e.category === cat)
+        .reduce((s, e) => s + e.amount, 0),
+      health: null,
+    }));
+
+    projectBudgets = projectRows
+      .filter((p) => p.budget !== null)
+      .map((p) => {
+        const spent = allTimeProjectSpent.get(p.id) ?? 0;
+        return {
+          id: p.id,
+          name: p.name,
+          subtitle: p.client.name,
+          budget: p.budget as number,
+          spent,
+          health: budgetHealth(p.budget as number, spent),
+        };
+      });
+
+    totals = sumTotals(projectBudgets);
+
+    for (const p of projectBudgets) {
+      if (p.health?.kind === "over") {
+        const pctOver = Math.round((p.spent / (p.budget as number) - 1) * 100);
+        budgetInsights.push(
+          `${p.name} is ${pctOver}% over its project budget — see Needs attention on the Dashboard.`
+        );
+      }
     }
-  }
-  if (mostHeadroomCat && maxHeadroom > 0) {
-    budgetInsights.push(
-      `${formatRupiah(maxHeadroom)} still left to spend on ${mostHeadroomCat.toLowerCase()} this month.`
-    );
+
+    const overCount = projectBudgets.filter((p) => p.health?.kind === "over").length;
+    projectNote =
+      `${formatRupiah(totals.budget)} planned across ${projectBudgets.length} projects · Spent ${formatRupiah(totals.spent)}` +
+      (overCount > 0 ? ` · ${overCount} over budget` : "") +
+      ". Each budget covers the whole project from start to finish.";
   }
 
   res.json({
-    period: periodLabel(today),
+    scope,
+    availableMonths,
     categoryBudgets,
     projectBudgets,
-    totals: {
-      budget: totalBudget,
-      spent: totalSpent,
-      remaining: totalBudget - totalSpent,
-      pctUsed: totalBudget === 0 ? 0 : Math.round((totalSpent / totalBudget) * 100),
-    },
-    projectTotals,
+    totals,
+    projectNote,
     budgetInsights,
   });
 });

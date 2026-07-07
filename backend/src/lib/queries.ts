@@ -150,6 +150,13 @@ export async function fetchCategoryBudgets(period: string): Promise<CategoryBudg
   return data;
 }
 
+/** Every month a category plan exists for (may contain duplicates across categories). */
+export async function fetchCategoryBudgetPeriods(): Promise<string[]> {
+  const { data, error } = await supabase.from("category_budgets").select("period");
+  if (error) throw error;
+  return data.map((row) => row.period);
+}
+
 export interface RevenueTargetRow {
   period: string;
   target_amount: number;

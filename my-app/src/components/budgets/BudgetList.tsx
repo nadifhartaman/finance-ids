@@ -26,11 +26,14 @@ export default function BudgetList({
   canEdit,
   kind,
   layout = "stack",
+  noPlanHint,
 }: {
   items: BudgetItem[];
   canEdit: boolean;
   kind: "category" | "project";
   layout?: "stack" | "grid";
+  /** Passed through to cards that have no plan in the current scope. */
+  noPlanHint?: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<BudgetItem | null>(null);
@@ -40,7 +43,7 @@ export default function BudgetList({
 
   function openEditor(item: BudgetItem) {
     setEditing(item);
-    setDraft(String(item.budget));
+    setDraft(item.budget === null ? "" : String(item.budget));
     setError(null);
   }
 
@@ -75,6 +78,7 @@ export default function BudgetList({
             key={item.id}
             item={item}
             onEdit={canEdit ? () => openEditor(item) : undefined}
+            noPlanHint={noPlanHint}
           />
         ))}
       </div>
@@ -115,8 +119,10 @@ export default function BudgetList({
               </label>
               {editing && (
                 <p className="mt-2 text-xs text-ink-muted">
-                  Current budget {formatRupiah(editing.budget)} · Spent so far{" "}
-                  {formatRupiah(editing.spent)}
+                  {editing.budget !== null && (
+                    <>Current budget {formatRupiah(editing.budget)} · </>
+                  )}
+                  Spent so far {formatRupiah(editing.spent)}
                 </p>
               )}
               {error && (

@@ -5,12 +5,25 @@ import {
 } from "@/components/shell/icons";
 import { SummaryCard } from "@/components/ui/summary-card";
 import { formatRupiah } from "@/lib/format";
-import type { BudgetTotals } from "@/lib/types";
+import type { BudgetScope, BudgetTotals } from "@/lib/types";
 
-export default function BudgetSummaryCards({ totals }: { totals: BudgetTotals }) {
+export default function BudgetSummaryCards({
+  totals,
+  scope,
+}: {
+  totals: BudgetTotals;
+  scope: BudgetScope;
+}) {
+  const budgetLabel =
+    scope.kind === "all"
+      ? "All project budgets"
+      : scope.isCurrent
+        ? "Total budget this month"
+        : `Total budget — ${scope.label}`;
+
   const CARDS = [
     {
-      label: "Total budget this month",
+      label: budgetLabel,
       value: formatRupiah(totals.budget),
       Icon: WalletIcon,
       iconClasses: "bg-primary-50 text-primary-500",
@@ -23,7 +36,7 @@ export default function BudgetSummaryCards({ totals }: { totals: BudgetTotals })
     },
     {
       label: "Left to spend",
-      value: formatRupiah(totals.remaining),
+      value: formatRupiah(Math.max(totals.remaining, 0)),
       Icon: WalletIcon,
       iconClasses: "bg-chip-success-bg text-chip-success-icon",
     },

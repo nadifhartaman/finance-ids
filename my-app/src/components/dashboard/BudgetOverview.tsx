@@ -43,14 +43,20 @@ export default function BudgetOverview({
           <div key={item.id}>
             <div className="flex items-center justify-between text-xs text-ink-secondary">
               <span>{item.name}</span>
-              <span>{item.health.pctUsed}% used</span>
+              <span>
+                {item.health
+                  ? `${item.health.pctUsed}% used`
+                  : `Spent ${formatRupiah(item.spent)}`}
+              </span>
             </div>
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-soft">
-              <div
-                className={`h-full rounded-full ${BAR_COLOR[item.health.kind]}`}
-                style={{ width: `${Math.min(item.health.pctUsed, 100)}%` }}
-              />
-            </div>
+            {item.health && (
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-soft">
+                <div
+                  className={`h-full rounded-full ${BAR_COLOR[item.health.kind]}`}
+                  style={{ width: `${Math.min(item.health.pctUsed, 100)}%` }}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

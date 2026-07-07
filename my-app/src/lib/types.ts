@@ -72,9 +72,11 @@ export interface BudgetItem {
   id: string;
   name: string;
   subtitle?: string;
-  budget: number;
+  /** null when this scope has no plan to compare against (e.g. a month with
+   * no plan set, or per-project spend inside a single month). */
+  budget: number | null;
   spent: number;
-  health: BudgetHealth;
+  health: BudgetHealth | null;
 }
 
 export type ProjectHealthKind = "over-budget" | "near-billing" | "on-schedule";
@@ -119,11 +121,16 @@ export interface BudgetTotals {
   pctUsed: number;
 }
 
-export interface ProjectBudgetTotals {
-  budget: number;
-  spent: number;
-  count: number;
-  overCount: number;
+export interface BudgetScope {
+  kind: "month" | "all";
+  period: string | null;
+  label: string;
+  isCurrent: boolean;
+}
+
+export interface BudgetMonthOption {
+  period: string;
+  label: string;
 }
 
 export interface DashboardResponse {
@@ -153,11 +160,12 @@ export interface ProjectsResponse {
 }
 
 export interface BudgetsResponse {
-  period: string;
+  scope: BudgetScope;
+  availableMonths: BudgetMonthOption[];
   categoryBudgets: BudgetItem[];
   projectBudgets: BudgetItem[];
   totals: BudgetTotals;
-  projectTotals: ProjectBudgetTotals;
+  projectNote: string;
   budgetInsights: string[];
 }
 

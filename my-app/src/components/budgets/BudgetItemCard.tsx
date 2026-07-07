@@ -17,13 +17,15 @@ const BAR_COLOR: Record<BudgetHealthKind, string> = {
 export default function BudgetItemCard({
   item,
   onEdit,
+  noPlanHint,
 }: {
   item: BudgetItem;
   /** Renders an "Edit budget" affordance; only passed for roles with `budgets.edit`. */
   onEdit?: () => void;
+  /** Shown instead of a health chip when the item has no plan in this scope. */
+  noPlanHint?: string;
 }) {
   const health = item.health;
-  const barWidth = Math.min(health.pctUsed, 100);
 
   return (
     <article className="rounded-2xl border border-card-border bg-card p-5 shadow-xs">
@@ -44,29 +46,44 @@ export default function BudgetItemCard({
               Edit budget
             </button>
           )}
-          <Chip color={CHIP_COLOR[health.kind]}>{health.label}</Chip>
+          {health ? (
+            <Chip color={CHIP_COLOR[health.kind]}>{health.label}</Chip>
+          ) : (
+            noPlanHint && (
+              <span className="text-xs text-ink-muted">{noPlanHint}</span>
+            )
+          )}
         </div>
       </div>
 
       <p className="mt-3 text-sm text-ink-secondary">
-        Budget {formatRupiah(item.budget)} · Spent {formatRupiah(item.spent)}
+        {item.budget !== null && <>Budget {formatRupiah(item.budget)} · </>}
+        Spent {formatRupiah(item.spent)}
       </p>
 
-      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-soft">
-        <div
-          className={`h-full rounded-full ${BAR_COLOR[health.kind]}`}
-          style={{ width: `${barWidth}%` }}
-        />
-      </div>
+      {health && (
+        <>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-soft">
+            <div
+              className={`h-full rounded-full ${BAR_COLOR[health.kind]}`}
+              style={{ width: `${Math.min(health.pctUsed, 100)}%` }}
+            />
+          </div>
 
-      <div className="mt-2 flex items-center justify-between text-xs text-ink-secondary">
-        <span>{health.pctUsed}% used</span>
-        <span className={health.kind === "over" ? "font-medium text-chip-error-text" : ""}>
-          {health.kind === "over"
-            ? `${formatRupiah(Math.abs(health.remaining))} over budget`
-            : `${formatRupiah(health.remaining)} remaining`}
-        </span>
-      </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-ink-secondary">
+            <span>{health.pctUsed}% used</span>
+            <span
+              className={
+                health.kind === "over" ? "font-medium text-chip-error-text" : ""
+              }
+            >
+              {health.kind === "over"
+                ? `${formatRupiah(Math.abs(health.remaining))} over budget`
+                : `${formatRupiah(health.remaining)} remaining`}
+            </span>
+          </div>
+        </>
+      )}
     </article>
   );
 }
