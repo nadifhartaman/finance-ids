@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BudgetOverview from "@/components/dashboard/BudgetOverview";
 import ChartPlaceholder from "@/components/dashboard/ChartPlaceholder";
 import DashboardNotes from "@/components/dashboard/DashboardNotes";
 import HeroCard from "@/components/dashboard/HeroCard";
@@ -8,7 +9,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
 import { Chip } from "@/components/ui/chip";
 import { getRequiredUser } from "@/lib/auth";
-import { getDashboard, getNotes } from "@/lib/api";
+import { getBudgets, getDashboard, getNotes } from "@/lib/api";
 import { formatRupiah } from "@/lib/format";
 import { can } from "@/lib/roles";
 
@@ -16,6 +17,7 @@ export default async function Home() {
   const user = await getRequiredUser();
   const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } = await getDashboard();
   const { notes } = await getNotes();
+  const { totals: budgetTotals, categoryBudgets } = await getBudgets();
   const cash = headlineStats.find((s) => s.id === "cash")!;
   const kpis = headlineStats.filter((s) => s.id !== "cash");
 
@@ -97,13 +99,7 @@ export default async function Home() {
             </Link>
           }
         >
-          <ChartPlaceholder kind="line" caption="Spending vs plan this month" />
-          <div className="mt-4">
-            <ChartPlaceholder
-              kind="bars"
-              caption="By category (payroll, operations, project costs)"
-            />
-          </div>
+          <BudgetOverview totals={budgetTotals} categoryBudgets={categoryBudgets} />
         </SectionCard>
 
         <SectionCard

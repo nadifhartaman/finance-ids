@@ -10,6 +10,7 @@ const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 
 trendsRouter.get("/", async (_req, res) => {
   const today = getToday();
+  const year = String(today.getUTCFullYear());
   const [invoiceRows, targetRows] = await Promise.all([
     fetchInvoices(),
     fetchRevenueTargets(),
@@ -24,8 +25,10 @@ trendsRouter.get("/", async (_req, res) => {
     revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + inv.amount);
   }
 
-  // The chart's months are the months leadership set a target for.
-  const monthlyRevenue = targetRows.map((t) => {
+  const yearTargets = targetRows.filter((t) => t.period.startsWith(year));
+
+  // The chart's months are the months leadership set a target for, in the current year.
+  const monthlyRevenue = yearTargets.map((t) => {
     const key = t.period.slice(0, 7);
     const monthIndex = Number(key.slice(5, 7)) - 1;
     return {
@@ -56,8 +59,10 @@ trendsRouter.get("/", async (_req, res) => {
     amount: byClientType.get(type) ?? 0,
   }));
 
-  const revenueThisYear = monthlyRevenue.reduce((s, m) => s + m.revenue, 0);
-  const yearTarget = monthlyRevenue.reduce((s, m) => s + m.target, 0);
+  const revenueThisYear = [...revenueByMonth.entries()]
+    .filter(([key]) => key.startsWith(year))
+    .reduce((s, [, amount]) => s + amount, 0);
+  const yearTarget = yearTargets.reduce((s, t) => s + t.target_amount, 0);
   const totalRevenue = revenueByClientType.reduce((s, c) => s + c.amount, 0);
   const government = revenueByClientType[0]?.amount ?? 0;
 

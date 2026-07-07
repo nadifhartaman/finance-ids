@@ -119,6 +119,13 @@ export interface BudgetTotals {
   pctUsed: number;
 }
 
+export interface ProjectBudgetTotals {
+  budget: number;
+  spent: number;
+  count: number;
+  overCount: number;
+}
+
 export interface DashboardResponse {
   asOf: string;
   period: string;
@@ -150,6 +157,7 @@ export interface BudgetsResponse {
   categoryBudgets: BudgetItem[];
   projectBudgets: BudgetItem[];
   totals: BudgetTotals;
+  projectTotals: ProjectBudgetTotals;
   budgetInsights: string[];
 }
 

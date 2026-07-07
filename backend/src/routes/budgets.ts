@@ -57,8 +57,19 @@ budgetsRouter.get("/", async (_req, res) => {
       };
     });
 
+  // Monthly-only: project budgets are lifetime caps on the same
+  // project_costs expenses already summed in categoryBudgets, so adding
+  // them here would double-count that money. See projectTotals below for
+  // the project-budgets summary instead.
   const totalBudget = categoryBudgets.reduce((s, b) => s + b.budget, 0);
   const totalSpent = categoryBudgets.reduce((s, b) => s + b.spent, 0);
+
+  const projectTotals = {
+    budget: projectBudgets.reduce((s, b) => s + b.budget, 0),
+    spent: projectBudgets.reduce((s, b) => s + b.spent, 0),
+    count: projectBudgets.length,
+    overCount: projectBudgets.filter((p) => p.health.kind === "over").length,
+  };
 
   const budgetInsights: string[] = [];
 
@@ -105,6 +116,7 @@ budgetsRouter.get("/", async (_req, res) => {
       remaining: totalBudget - totalSpent,
       pctUsed: totalBudget === 0 ? 0 : Math.round((totalSpent / totalBudget) * 100),
     },
+    projectTotals,
     budgetInsights,
   });
 });

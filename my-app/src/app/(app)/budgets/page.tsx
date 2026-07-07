@@ -4,12 +4,14 @@ import BudgetProgressRing from "@/components/budgets/BudgetProgressRing";
 import BudgetSummaryCards from "@/components/budgets/BudgetSummaryCards";
 import { getRequiredUser } from "@/lib/auth";
 import { getBudgets } from "@/lib/api";
+import { formatRupiah } from "@/lib/format";
 import { can } from "@/lib/roles";
 
 export default async function BudgetsPage() {
   const user = await getRequiredUser();
   const canEdit = can(user.role, "budgets.edit");
-  const { categoryBudgets, projectBudgets, totals, budgetInsights } = await getBudgets();
+  const { categoryBudgets, projectBudgets, totals, projectTotals, budgetInsights } =
+    await getBudgets();
   return (
     <>
       <header>
@@ -45,6 +47,13 @@ export default async function BudgetsPage() {
             <h2 className="text-lg font-semibold text-title">
               Project budgets
             </h2>
+            <p className="mt-1 text-sm text-ink-secondary">
+              {formatRupiah(projectTotals.budget)} planned across{" "}
+              {projectTotals.count} projects · Spent{" "}
+              {formatRupiah(projectTotals.spent)}
+              {projectTotals.overCount > 0 &&
+                ` · ${projectTotals.overCount} over budget`}
+            </p>
             <div className="mt-3">
               <BudgetList
                 items={projectBudgets}
