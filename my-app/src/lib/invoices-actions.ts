@@ -61,3 +61,15 @@ export async function voidInvoice(id: string): Promise<{ error: string | null }>
     "Failed to cancel invoice.",
   );
 }
+
+export async function recordPayment(
+  id: string,
+  input: { amountReceived: number; receivedDate: string },
+): Promise<{ error: string | null }> {
+  return patchAction(
+    `/api/invoices/${id}/payment`,
+    input,
+    ["/invoices", "/"],
+    "Failed to record payment.",
+  );
+}

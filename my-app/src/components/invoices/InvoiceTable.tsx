@@ -16,6 +16,7 @@ import type { Invoice, InvoiceStatusKind, ProjectOption } from "@/lib/types";
 import { formatDate, formatRupiah } from "@/lib/format";
 import { voidInvoice } from "@/lib/invoices-actions";
 import InvoiceFormDialog from "./InvoiceFormDialog";
+import RecordPaymentDialog from "./RecordPaymentDialog";
 
 const ROWS_PER_PAGE = 8;
 
@@ -89,6 +90,7 @@ export default function InvoiceTable({
   const [page, setPage] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
   const [formTarget, setFormTarget] = useState<Invoice | "create" | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<Invoice | null>(null);
   const [isVoiding, startVoidTransition] = useTransition();
 
   const filtered = useMemo(() => {
@@ -214,7 +216,9 @@ export default function InvoiceTable({
             ) : (
               pageRows.map((invoice) => {
                 const status = invoice.status;
-                const canVoid = status.kind !== "void" && status.kind !== "paid";
+                const isOpen = status.kind !== "void" && status.kind !== "paid";
+                const canVoid = isOpen;
+                const canRecordPayment = isOpen;
                 return (
                   <TableRow key={invoice.id}>
                     <TableCell>
@@ -234,10 +238,19 @@ export default function InvoiceTable({
                     <TableCell>{formatDate(invoice.dueDate)}</TableCell>
                     {canWrite && (
                       <TableCell className="text-right whitespace-nowrap">
+                        {canRecordPayment && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentTarget(invoice)}
+                            className="rounded-md px-2 py-0.5 text-xs font-medium text-chip-success-text hover:bg-chip-success-bg"
+                          >
+                            Record payment
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setFormTarget(invoice)}
-                          className="rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
+                          className="ml-1 rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
                         >
                           Edit
                         </button>
@@ -314,6 +327,17 @@ export default function InvoiceTable({
           }}
           projects={projects}
           invoice={formTarget === "create" ? undefined : (formTarget ?? undefined)}
+        />
+      )}
+
+      {canWrite && paymentTarget && (
+        <RecordPaymentDialog
+          key={paymentTarget.id}
+          isOpen={paymentTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setPaymentTarget(null);
+          }}
+          invoice={paymentTarget}
         />
       )}
     </div>

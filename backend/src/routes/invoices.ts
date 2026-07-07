@@ -2,7 +2,7 @@ import { Router } from "express";
 import { invoiceStatus, outstanding } from "../lib/derive.js";
 import { asOfLabel } from "../lib/format.js";
 import { requirePermission } from "../middleware/auth.js";
-import { createInvoice, updateInvoice, voidInvoice } from "../lib/mutations.js";
+import { createInvoice, recordInvoicePayment, updateInvoice, voidInvoice } from "../lib/mutations.js";
 import { fetchInvoiceById, fetchInvoices } from "../lib/queries.js";
 import { getToday } from "../lib/time.js";
 
@@ -122,6 +122,28 @@ invoicesRouter.patch("/:id", requirePermission("invoices.write"), async (req, re
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : "Failed to update invoice" });
+  }
+});
+
+invoicesRouter.patch("/:id/payment", requirePermission("invoices.write"), async (req, res) => {
+  const { id } = req.params;
+  const { amountReceived, receivedDate } = req.body ?? {};
+  if (
+    typeof id !== "string" ||
+    typeof amountReceived !== "number" ||
+    !Number.isFinite(amountReceived) ||
+    amountReceived <= 0 ||
+    !isIsoDate(receivedDate)
+  ) {
+    res.status(400).json({ error: "A positive amountReceived and a valid receivedDate are required" });
+    return;
+  }
+
+  try {
+    await recordInvoicePayment(id, amountReceived, receivedDate, req.user!.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "Failed to record payment" });
   }
 });
 

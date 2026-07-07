@@ -12,6 +12,7 @@ import {
   fetchRevenueTargets,
 } from "./queries.js";
 import { logAudit } from "./audit.js";
+import { formatRupiah } from "./format.js";
 import type { Database } from "../types/database.js";
 
 export type ExpenseCategory = Database["public"]["Enums"]["expense_category"];
@@ -214,6 +215,51 @@ export async function voidInvoice(id: string, actorId: string): Promise<void> {
     entityId: id,
     before: before ? { voidedAt: before.voided_at } : null,
     after: { voidedAt },
+  });
+}
+
+/**
+ * Records money that actually arrived — status is never set directly (see
+ * docs/erd.md "Derived, never stored"); it's recomputed from amount_paid /
+ * paid_date every time invoiceStatus() runs. Partial payments are expected
+ * (government clients commonly short-pay); paid_date is only set once
+ * amount_paid reaches the full amount, matching the DB CHECK.
+ */
+export async function recordInvoicePayment(
+  id: string,
+  amountReceived: number,
+  receivedDate: string,
+  actorId: string,
+): Promise<void> {
+  const before = await fetchInvoiceById(id);
+  if (!before) throw new Error("Invoice not found");
+  if (before.voided_at) throw new Error("This invoice was cancelled — it can't receive payments");
+  if (before.amount_paid >= before.amount) throw new Error("This invoice is already fully paid");
+
+  const newAmountPaid = before.amount_paid + amountReceived;
+  if (newAmountPaid > before.amount) {
+    const remaining = before.amount - before.amount_paid;
+    throw new Error(
+      `That's more than what's left on this invoice — ${formatRupiah(remaining)} outstanding`,
+    );
+  }
+
+  const isFullySettled = newAmountPaid === before.amount;
+  const paidDate = isFullySettled ? receivedDate : null;
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({ amount_paid: newAmountPaid, paid_date: paidDate })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "payment",
+    entity: "invoice",
+    entityId: id,
+    before: { amountPaid: before.amount_paid, paidDate: before.paid_date },
+    after: { amountPaid: newAmountPaid, paidDate, amountReceived },
   });
 }
 
