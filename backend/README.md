@@ -2,8 +2,6 @@
 
 Express 5 + TypeScript REST API for the Indismart Internal Financial Dashboard. Reads and writes live Supabase (Postgres) data and serves it to the [Next.js frontend](../my-app). Deployed on Railway at `https://finance-ids-production.up.railway.app`.
 
-For product/domain context (target user, jargon glossary, KPIs) see the root [`CLAUDE.md`](../CLAUDE.md). For agent-facing implementation rules see [`CLAUDE.md`](./CLAUDE.md) in this folder.
-
 ## Tech stack
 
 - **Runtime/framework:** Express 5, TypeScript (strict mode), Node with `tsx` for dev
@@ -67,7 +65,6 @@ There is no test or lint script configured yet.
   npx supabase gen types typescript --project-id <ref> --schema public > src/types/database.ts
   ```
   (needs `SUPABASE_ACCESS_TOKEN` set, or run `supabase login` first).
-- Full schema reference: [`docs/erd.md`](../docs/erd.md) at the repo root.
 - **RLS is enabled with zero policies (deny-all)** on every table. The service-role key bypasses RLS entirely — authorization is enforced by this API's middleware, not the database.
 
 ## Authentication & authorization

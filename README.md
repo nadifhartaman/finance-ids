@@ -4,12 +4,12 @@ The Indismart Internal Financial Dashboard — replaces manual/Excel-based finan
 
 **Company:** Indismart Kreatif Solusi — AI & IoT solutions company (Bandung, Indonesia). Project-based B2G/B2B business: clients include government agencies (Bapenda, Dishub, Diskominfo, Komdigi, Kemenperin, RSUD Hasan Sadikin) and private enterprise (Pertamina). Product lines: VIANA (AI video analytics), ORION (IoT data platform), AIoT (Smart ID/NFC), Indi AI (smart city platform), 3D Digital Twin.
 
-**Primary user:** the Director — non-technical, not a finance professional. The whole product is built around plain-language copy, a shallow 5-page nav, and headline numbers with 🔴/🟡/🟢 status instead of raw ratios. See [`CLAUDE.md`](./CLAUDE.md) for the full product/domain rules, jargon glossary, and KPI list.
+**Primary user:** the Director — non-technical, not a finance professional. The whole product is built around plain-language copy, a shallow 5-page nav, and headline numbers with 🔴/🟡/🟢 status instead of raw ratios.
 
 ## Live app
 
+- **Frontend:** `https://finance-ids.vercel.app` — see [`my-app/README.md`](./my-app/README.md)
 - **Backend API:** `https://finance-ids-production.up.railway.app` — see [`backend/README.md`](./backend/README.md)
-- **Frontend:** not yet deployed to production — see [`my-app/README.md`](./my-app/README.md) for local setup
 
 ## Repo layout
 
@@ -17,10 +17,6 @@ The Indismart Internal Financial Dashboard — replaces manual/Excel-based finan
 |---|---|
 | [`my-app/`](./my-app) | Frontend — Next.js 16 + React 19 + Tailwind 4. Setup, routes, architecture: [`my-app/README.md`](./my-app/README.md) |
 | [`backend/`](./backend) | Backend — Express 5 + TypeScript API on Supabase. Setup, full API reference: [`backend/README.md`](./backend/README.md) |
-| [`reference/tailgrids/`](./reference/tailgrids) | TailGrids (React + Tailwind component library) — the UI/UX design reference the frontend imitates. **Read-only**, never edited or imported at runtime. |
-| [`docs/erd.md`](./docs/erd.md) | Database schema (Mermaid ERD, table rationale, derived-values rules) that `backend/supabase/migrations/` implements |
-| `docs/agents/` | Agent-facing process docs: issue tracking, triage labels, domain-doc conventions |
-| `.scratch/<feature-slug>/` | Local issue tracker / PRDs (no remote tracker) |
 
 ## Architecture at a glance
 
@@ -61,9 +57,4 @@ The frontend's `API_URL` env var must point at the backend (defaults to `http://
 - **Backend:** authenticated read + write API backed by real Supabase data, deployed to Railway. User management and write endpoints for invoices/projects/budgets/trends are live; audit logging is partial.
 - **Not yet done:** full write-path audit logging, user-management audit coverage.
 
-See each app's `README.md`/`CLAUDE.md` for current detail, and `docs/agents/issue-tracker.md` for how in-flight work is tracked.
-
-## Contributing
-
-- Read the relevant `CLAUDE.md` before making changes — root for product/domain rules, [`backend/CLAUDE.md`](./backend/CLAUDE.md) and [`my-app/CLAUDE.md`](./my-app/CLAUDE.md) for app-specific implementation rules.
-- Issues/PRDs are tracked as local markdown files under `.scratch/<feature-slug>/`, not a remote tracker.
+See each app's `README.md` for current detail.

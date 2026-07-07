@@ -2,7 +2,7 @@
 
 Next.js 16 + React 19 frontend for the Indismart Internal Financial Dashboard — a 5-page internal tool (Dashboard, Invoices, Trends, Budgets, Projects) that gives a non-technical Director a plain-language view of company financial health, backed by the [Express API](../backend).
 
-For product/domain context (target user, jargon glossary, KPIs) see the root [`CLAUDE.md`](../CLAUDE.md). For agent-facing implementation rules see [`CLAUDE.md`](./CLAUDE.md), and for deeper docs see [`docs/architecture.md`](./docs/architecture.md) and [`docs/style-guide.md`](./docs/style-guide.md).
+**Live:** [`https://finance-ids.vercel.app`](https://finance-ids.vercel.app)
 
 ## Tech stack
 
@@ -114,7 +114,7 @@ All backend calls happen server-side (Server Components and Server Actions) — 
 
 ## Design system
 
-UI imitates **TailGrids** (React + Tailwind component library, checked out read-only at `../reference/tailgrids/` — never edit or import from it at runtime; components are ported into `src/components/ui/`). Theme is white-dominant with purple accents, fixed light (no dark mode). Full token/typography/component reference: [`docs/style-guide.md`](./docs/style-guide.md).
+UI imitates **TailGrids** (React + Tailwind component library) — components are ported into `src/components/ui/`, never imported at runtime. Theme is white-dominant with purple accents, fixed light (no dark mode).
 
 ## Conventions
 
@@ -122,4 +122,4 @@ UI imitates **TailGrids** (React + Tailwind component library, checked out read-
 - Server Components by default; `"use client"` pushed as far down the tree as possible.
 - Design tokens live in `@theme` in `globals.css`; components use semantic token classes, never raw hex or palette classes.
 - Status colors (good/warning/critical) always ship with an icon or text label, never color alone.
-- UI copy is plain language only — see the jargon glossary in the root [`CLAUDE.md`](../CLAUDE.md).
+- UI copy is plain language only — no financial jargon, since the primary user (the Director) isn't a finance professional.
