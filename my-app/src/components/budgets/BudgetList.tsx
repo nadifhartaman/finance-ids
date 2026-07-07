@@ -27,6 +27,7 @@ export default function BudgetList({
   kind,
   layout = "stack",
   noPlanHint,
+  initialCount,
 }: {
   items: BudgetItem[];
   canEdit: boolean;
@@ -34,12 +35,18 @@ export default function BudgetList({
   layout?: "stack" | "grid";
   /** Passed through to cards that have no plan in the current scope. */
   noPlanHint?: string;
+  /** Collapse to this many items behind a "Show all" toggle when there are more. */
+  initialCount?: number;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<BudgetItem | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [showAll, setShowAll] = useState(false);
+
+  const canCollapse = initialCount !== undefined && items.length > initialCount;
+  const visibleItems = canCollapse && !showAll ? items.slice(0, initialCount) : items;
 
   function openEditor(item: BudgetItem) {
     setEditing(item);
@@ -73,7 +80,7 @@ export default function BudgetList({
           layout === "grid" ? "grid gap-4 sm:grid-cols-2" : "space-y-4"
         }
       >
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <BudgetItemCard
             key={item.id}
             item={item}
@@ -82,6 +89,16 @@ export default function BudgetList({
           />
         ))}
       </div>
+
+      {canCollapse && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-3 text-sm font-medium text-primary-700 hover:underline"
+        >
+          {showAll ? "Show less" : `Show all ${items.length}`}
+        </button>
+      )}
 
       <Dialog
         isOpen={editing !== null}

@@ -88,6 +88,8 @@ export default async function BudgetsPage({
                 canEdit={canEditProjects}
                 kind="project"
                 layout="grid"
+                initialCount={6}
+                noPlanHint={scope.kind === "all" ? "No budget set" : undefined}
               />
             </div>
           </section>

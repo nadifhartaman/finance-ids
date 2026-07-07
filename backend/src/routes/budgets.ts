@@ -120,17 +120,18 @@ budgetsRouter.get("/", async (req, res) => {
       };
     });
 
-    // Per-project spend inside this one month. No health: project budgets cap
-    // the whole project, so a single month has nothing to compare against.
+    // Every project, whether or not it spent anything this month — hiding
+    // zero-spend projects made the list look incomplete (only 5 of 12
+    // showed up with the seed data). No health: project budgets cap the
+    // whole project, so a single month has nothing to compare against.
     const monthProjectSpent = spentByProject(monthExpenses);
     projectBudgets = projectRows
-      .filter((p) => (monthProjectSpent.get(p.id) ?? 0) > 0)
       .map((p) => ({
         id: p.id,
         name: p.name,
         subtitle: p.client.name,
         budget: null,
-        spent: monthProjectSpent.get(p.id) as number,
+        spent: monthProjectSpent.get(p.id) ?? 0,
         health: null,
       }))
       .sort((a, b) => b.spent - a.spent);
@@ -164,7 +165,7 @@ budgetsRouter.get("/", async (req, res) => {
 
     const monthProjectTotal = projectBudgets.reduce((s, p) => s + p.spent, 0);
     projectNote =
-      projectBudgets.length === 0
+      monthProjectTotal === 0
         ? `No project spending recorded ${inMonth}.`
         : `Projects spent ${formatRupiah(monthProjectTotal)} ${inMonth}. Project budgets cover the whole project — switch to "All time" to compare against them.`;
   } else {
@@ -180,7 +181,14 @@ budgetsRouter.get("/", async (req, res) => {
       health: null,
     }));
 
-    projectBudgets = projectRows
+    // Budgeted projects keep their cap + health chip; unbudgeted ones still
+    // show up (spend-only, no cap to compare against) — hiding them made 7
+    // of 12 projects invisible even though their spend is already counted
+    // in the category totals above. Ring/totals stay scoped to the
+    // budgeted subset only, so "budget" and "spent" always describe the
+    // same set of projects (mixing in unbudgeted spend would inflate
+    // "spent" against a "budget" that never accounted for it).
+    const budgetedProjects = projectRows
       .filter((p) => p.budget !== null)
       .map((p) => {
         const spent = allTimeProjectSpent.get(p.id) ?? 0;
@@ -193,21 +201,34 @@ budgetsRouter.get("/", async (req, res) => {
           health: budgetHealth(p.budget as number, spent),
         };
       });
+    const unbudgetedProjects = projectRows
+      .filter((p) => p.budget === null)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        subtitle: p.client.name,
+        budget: null,
+        spent: allTimeProjectSpent.get(p.id) ?? 0,
+        health: null,
+      }));
 
-    totals = sumTotals(projectBudgets);
+    totals = sumTotals(budgetedProjects);
+    projectBudgets = [...budgetedProjects, ...unbudgetedProjects].sort(
+      (a, b) => (b.health?.pctUsed ?? -1) - (a.health?.pctUsed ?? -1) || b.spent - a.spent,
+    );
 
-    for (const p of projectBudgets) {
-      if (p.health?.kind === "over") {
-        const pctOver = Math.round((p.spent / (p.budget as number) - 1) * 100);
+    for (const p of budgetedProjects) {
+      if (p.health.kind === "over") {
+        const pctOver = Math.round((p.spent / p.budget - 1) * 100);
         budgetInsights.push(
           `${p.name} is ${pctOver}% over its project budget — see Needs attention on the Dashboard.`
         );
       }
     }
 
-    const overCount = projectBudgets.filter((p) => p.health?.kind === "over").length;
+    const overCount = budgetedProjects.filter((p) => p.health.kind === "over").length;
     projectNote =
-      `${formatRupiah(totals.budget)} planned across ${projectBudgets.length} projects · Spent ${formatRupiah(totals.spent)}` +
+      `${formatRupiah(totals.budget)} planned across ${budgetedProjects.length} projects · Spent ${formatRupiah(totals.spent)}` +
       (overCount > 0 ? ` · ${overCount} over budget` : "") +
       ". Each budget covers the whole project from start to finish.";
   }
