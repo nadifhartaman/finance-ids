@@ -161,4 +161,23 @@ export interface TrendsResponse {
   yearTargetPct: number;
   governmentSharePct: number;
   topProductLine: string;
+  currentPeriod: string;
+  currentTarget: number;
+}
+
+export interface NoteItem {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface NotesResponse {
+  notes: NoteItem[];
+}
+
+export interface ProjectOption {
+  id: string;
+  name: string;
+  client: string;
 }

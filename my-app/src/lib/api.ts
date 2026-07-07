@@ -5,6 +5,7 @@ import {
   BudgetsResponse,
   DashboardResponse,
   InvoicesResponse,
+  NotesResponse,
   ProjectsResponse,
   TrendsResponse,
 } from "./types";
@@ -42,4 +43,8 @@ export function getBudgets(): Promise<BudgetsResponse> {
 
 export function getTrends(): Promise<TrendsResponse> {
   return getJson<TrendsResponse>("/api/trends");
+}
+
+export function getNotes(): Promise<NotesResponse> {
+  return getJson<NotesResponse>("/api/notes");
 }

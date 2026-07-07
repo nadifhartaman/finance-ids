@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { SearchIcon } from "@/components/shell/icons";
 import {
   TableBody,
@@ -11,8 +12,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Chip, type ChipColor } from "@/components/ui/chip";
-import type { Invoice, InvoiceStatusKind } from "@/lib/types";
+import type { Invoice, InvoiceStatusKind, ProjectOption } from "@/lib/types";
 import { formatDate, formatRupiah } from "@/lib/format";
+import { voidInvoice } from "@/lib/invoices-actions";
+import InvoiceFormDialog from "./InvoiceFormDialog";
 
 const ROWS_PER_PAGE = 8;
 
@@ -70,17 +73,23 @@ function downloadCsv(rows: Invoice[]) {
 export default function InvoiceTable({
   invoices,
   canWrite = false,
+  projects = [],
 }: {
   invoices: Invoice[];
-  /** Shows add/edit affordances; only passed for roles with `invoices.write`. */
+  /** Shows add/edit/void affordances; only passed for roles with `invoices.write`. */
   canWrite?: boolean;
+  /** For the "New invoice" project dropdown; only needed when canWrite. */
+  projects?: ProjectOption[];
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<InvoiceStatusKind | "all">(
     "all",
   );
   const [page, setPage] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
+  const [formTarget, setFormTarget] = useState<Invoice | "create" | null>(null);
+  const [isVoiding, startVoidTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -111,6 +120,18 @@ export default function InvoiceTable({
   function updateStatusFilter(value: InvoiceStatusKind | "all") {
     setStatusFilter(value);
     setPage(1);
+  }
+
+  function handleVoid(invoice: Invoice) {
+    if (!window.confirm(`Cancel invoice ${invoice.number}? This can't be undone.`)) return;
+    startVoidTransition(async () => {
+      const result = await voidInvoice(invoice.id);
+      if (result.error) {
+        setNotice(result.error);
+        return;
+      }
+      router.refresh();
+    });
   }
 
   return (
@@ -149,11 +170,7 @@ export default function InvoiceTable({
         {canWrite && (
           <button
             type="button"
-            onClick={() =>
-              setNotice(
-                "Adding invoices arrives when real auth and write endpoints land — this preview shows who will see this button.",
-              )
-            }
+            onClick={() => setFormTarget("create")}
             className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
           >
             New invoice
@@ -197,6 +214,7 @@ export default function InvoiceTable({
             ) : (
               pageRows.map((invoice) => {
                 const status = invoice.status;
+                const canVoid = status.kind !== "void" && status.kind !== "paid";
                 return (
                   <TableRow key={invoice.id}>
                     <TableCell>
@@ -215,18 +233,24 @@ export default function InvoiceTable({
                     <TableCell>{formatDate(invoice.issuedDate)}</TableCell>
                     <TableCell>{formatDate(invoice.dueDate)}</TableCell>
                     {canWrite && (
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() =>
-                            setNotice(
-                              `Editing ${invoice.number} arrives when real auth and write endpoints land — this preview shows who will see this button.`,
-                            )
-                          }
+                          onClick={() => setFormTarget(invoice)}
                           className="rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
                         >
                           Edit
                         </button>
+                        {canVoid && (
+                          <button
+                            type="button"
+                            disabled={isVoiding}
+                            onClick={() => handleVoid(invoice)}
+                            className="ml-1 rounded-md px-2 py-0.5 text-xs font-medium text-chip-error-text hover:bg-chip-error-bg disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>
@@ -280,6 +304,18 @@ export default function InvoiceTable({
           </button>
         </div>
       </div>
+
+      {canWrite && (
+        <InvoiceFormDialog
+          key={formTarget === "create" ? "create" : (formTarget?.id ?? "closed")}
+          isOpen={formTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setFormTarget(null);
+          }}
+          projects={projects}
+          invoice={formTarget === "create" ? undefined : (formTarget ?? undefined)}
+        />
+      )}
     </div>
   );
 }

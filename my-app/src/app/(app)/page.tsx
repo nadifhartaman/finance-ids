@@ -1,16 +1,21 @@
 import Link from "next/link";
 import ChartPlaceholder from "@/components/dashboard/ChartPlaceholder";
+import DashboardNotes from "@/components/dashboard/DashboardNotes";
 import HeroCard from "@/components/dashboard/HeroCard";
 import NeedsAttention from "@/components/dashboard/NeedsAttention";
 import SectionCard from "@/components/ui/section-card";
 import StatCard from "@/components/dashboard/StatCard";
 import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
 import { Chip } from "@/components/ui/chip";
-import { getDashboard } from "@/lib/api";
+import { getRequiredUser } from "@/lib/auth";
+import { getDashboard, getNotes } from "@/lib/api";
 import { formatRupiah } from "@/lib/format";
+import { can } from "@/lib/roles";
 
 export default async function Home() {
+  const user = await getRequiredUser();
   const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } = await getDashboard();
+  const { notes } = await getNotes();
   const cash = headlineStats.find((s) => s.id === "cash")!;
   const kpis = headlineStats.filter((s) => s.id !== "cash");
 
@@ -147,6 +152,14 @@ export default async function Home() {
         </SectionCard>
       </div>
 
+      <div className="mt-4">
+        <SectionCard
+          title="Notes"
+          question="Any context worth remembering about this month's numbers?"
+        >
+          <DashboardNotes notes={notes} canWrite={can(user.role, "notes.write")} />
+        </SectionCard>
+      </div>
     </>
   );
 }

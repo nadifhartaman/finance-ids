@@ -1,11 +1,15 @@
 import ClientTypeChart from "@/components/trends/ClientTypeChart";
 import ProductLineDonut from "@/components/trends/ProductLineDonut";
+import RevenueTargetEditor from "@/components/trends/RevenueTargetEditor";
 import RevenueTrendChart from "@/components/trends/RevenueTrendChart";
 import TrendsSummaryCards from "@/components/trends/TrendsSummaryCards";
 import SectionCard from "@/components/ui/section-card";
+import { getRequiredUser } from "@/lib/auth";
 import { getTrends } from "@/lib/api";
+import { can } from "@/lib/roles";
 
 export default async function TrendsPage() {
+  const user = await getRequiredUser();
   const {
     monthlyRevenue,
     revenueByClientType,
@@ -14,6 +18,8 @@ export default async function TrendsPage() {
     yearTargetPct,
     governmentSharePct,
     topProductLine,
+    currentPeriod,
+    currentTarget,
   } = await getTrends();
   return (
     <>
@@ -39,6 +45,11 @@ export default async function TrendsPage() {
         <SectionCard
           title="Revenue vs target"
           question="Are we on track to hit this year's revenue target?"
+          action={
+            can(user.role, "targets.edit") ? (
+              <RevenueTargetEditor currentPeriod={currentPeriod} currentTarget={currentTarget} />
+            ) : undefined
+          }
         >
           <RevenueTrendChart data={monthlyRevenue} />
         </SectionCard>

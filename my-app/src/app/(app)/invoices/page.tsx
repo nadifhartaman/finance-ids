@@ -1,12 +1,15 @@
 import InvoiceSummaryCards from "@/components/invoices/InvoiceSummaryCards";
 import InvoiceTable from "@/components/invoices/InvoiceTable";
 import { getRequiredUser } from "@/lib/auth";
-import { getInvoices } from "@/lib/api";
+import { getInvoices, getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function InvoicesPage() {
-  const { invoices, summary } = await getInvoices();
   const user = await getRequiredUser();
+  const canWrite = can(user.role, "invoices.write");
+  const { invoices, summary } = await getInvoices();
+  const projects = canWrite ? (await getProjects()).projects : [];
+
   return (
     <>
       <header>
@@ -25,7 +28,8 @@ export default async function InvoicesPage() {
       <div className="mt-4">
         <InvoiceTable
           invoices={invoices}
-          canWrite={can(user.role, "invoices.write")}
+          canWrite={canWrite}
+          projects={projects.map((p) => ({ id: p.id, name: p.name, client: p.client }))}
         />
       </div>
     </>
