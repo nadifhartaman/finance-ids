@@ -7,6 +7,7 @@
  */
 import { supabase } from "./supabase.js";
 import type { Role } from "./permissions.js";
+import { invalidateProfileCache } from "../middleware/auth.js";
 
 export interface UserListItem {
   id: string;
@@ -68,9 +69,11 @@ export async function createUser(input: CreateUserInput): Promise<UserListItem> 
 export async function updateUserRole(id: string, role: Role): Promise<void> {
   const { error } = await supabase.from("profiles").update({ role }).eq("id", id);
   if (error) throw error;
+  invalidateProfileCache(id);
 }
 
 export async function updateUserActive(id: string, isActive: boolean): Promise<void> {
   const { error } = await supabase.from("profiles").update({ is_active: isActive }).eq("id", id);
   if (error) throw error;
+  invalidateProfileCache(id);
 }

@@ -9,7 +9,7 @@ import { getTrends } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function TrendsPage() {
-  const user = await getRequiredUser();
+  const [user, trends] = await Promise.all([getRequiredUser(), getTrends()]);
   const {
     monthlyRevenue,
     revenueByClientType,
@@ -20,7 +20,7 @@ export default async function TrendsPage() {
     topProductLine,
     currentPeriod,
     currentTarget,
-  } = await getTrends();
+  } = trends;
   return (
     <>
       <header>

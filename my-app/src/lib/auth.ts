@@ -2,6 +2,7 @@
  * Real session — replaces auth-mock.ts. The frontend never talks to
  * Supabase directly; login and identity both proxy through the Express API.
  */
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "./session-cookie";
@@ -9,8 +10,13 @@ import type { AppUser } from "./roles";
 
 export { SESSION_COOKIE };
 
-/** Null when logged out, the token is invalid, or the account is deactivated. */
-export async function getCurrentUser(): Promise<AppUser | null> {
+/**
+ * Null when logged out, the token is invalid, or the account is deactivated.
+ * Wrapped in React's per-request `cache()` — the (app) layout and every page
+ * call this, and without the wrapper each one fired its own GET /me, tripling
+ * a Dashboard render's round trips to the backend for no reason.
+ */
+export const getCurrentUser = cache(async (): Promise<AppUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
@@ -23,7 +29,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
 
   const { user } = await res.json();
   return user as AppUser;
-}
+});
 
 /**
  * For pages that need a non-null user. The (app) layout already redirects

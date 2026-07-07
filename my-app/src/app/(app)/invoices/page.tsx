@@ -5,10 +5,13 @@ import { getInvoices, getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function InvoicesPage() {
-  const user = await getRequiredUser();
+  const [user, { invoices, summary }, { projects: allProjects }] = await Promise.all([
+    getRequiredUser(),
+    getInvoices(),
+    getProjects(),
+  ]);
   const canWrite = can(user.role, "invoices.write");
-  const { invoices, summary } = await getInvoices();
-  const projects = canWrite ? (await getProjects()).projects : [];
+  const projects = canWrite ? allProjects : [];
 
   return (
     <>

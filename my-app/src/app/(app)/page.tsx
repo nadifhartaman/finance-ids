@@ -14,10 +14,10 @@ import { formatRupiah } from "@/lib/format";
 import { can } from "@/lib/roles";
 
 export default async function Home() {
-  const user = await getRequiredUser();
-  const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } = await getDashboard();
-  const { notes } = await getNotes();
-  const { totals: budgetTotals, categoryBudgets } = await getBudgets();
+  const [user, dashboard, { notes }, { totals: budgetTotals, categoryBudgets }] =
+    await Promise.all([getRequiredUser(), getDashboard(), getNotes(), getBudgets()]);
+  const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } =
+    dashboard;
   const cash = headlineStats.find((s) => s.id === "cash")!;
   const kpis = headlineStats.filter((s) => s.id !== "cash");
 

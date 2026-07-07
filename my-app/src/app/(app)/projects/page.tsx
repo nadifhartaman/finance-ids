@@ -5,8 +5,7 @@ import { getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function ProjectsPage() {
-  const { projects, stats } = await getProjects();
-  const user = await getRequiredUser();
+  const [{ projects, stats }, user] = await Promise.all([getProjects(), getRequiredUser()]);
   return (
     <>
       <header>

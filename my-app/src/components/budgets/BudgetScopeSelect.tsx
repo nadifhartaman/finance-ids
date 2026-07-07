@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { BudgetMonthOption, BudgetScope } from "@/lib/types";
 
@@ -16,6 +17,7 @@ export default function BudgetScopeSelect({
   months: BudgetMonthOption[];
 }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const value =
     scope.kind === "all" ? "all" : scope.isCurrent ? "" : (scope.period ?? "");
 
@@ -24,11 +26,14 @@ export default function BudgetScopeSelect({
       Showing
       <select
         value={value}
+        disabled={isPending}
         onChange={(e) => {
           const next = e.target.value;
-          router.push(next === "" ? "/budgets" : `/budgets?scope=${next}`);
+          startTransition(() => {
+            router.push(next === "" ? "/budgets" : `/budgets?scope=${next}`);
+          });
         }}
-        className="rounded-lg border border-card-border bg-card px-3 py-2 text-sm font-medium text-title"
+        className="rounded-lg border border-card-border bg-card px-3 py-2 text-sm font-medium text-title disabled:opacity-60"
       >
         <option value="">This month</option>
         {months.map((m) => (
@@ -38,6 +43,7 @@ export default function BudgetScopeSelect({
         ))}
         <option value="all">All time</option>
       </select>
+      {isPending && <span className="text-xs text-ink-muted">Updating…</span>}
     </label>
   );
 }

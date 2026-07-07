@@ -19,7 +19,7 @@ export default async function BudgetsPage({
       ? scopeParam
       : undefined;
 
-  const user = await getRequiredUser();
+  const [user, budgets] = await Promise.all([getRequiredUser(), getBudgets(requestedScope)]);
   const canEdit = can(user.role, "budgets.edit");
   const {
     scope,
@@ -29,7 +29,7 @@ export default async function BudgetsPage({
     totals,
     projectNote,
     budgetInsights,
-  } = await getBudgets(requestedScope);
+  } = budgets;
 
   // Category plans can only be edited for the month being planned (the
   // current one); project budgets are whole-project, edited in All time.
