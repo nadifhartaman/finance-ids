@@ -198,6 +198,16 @@ export interface ProjectOption {
   client: string;
 }
 
+export type ExpenseCategory = "payroll" | "operations" | "project_costs";
+
+export interface Expense {
+  category: ExpenseCategory;
+  projectId: string | null;
+  description: string;
+  amount: number;
+  spentOn: string;
+}
+
 export type ClientType = "government" | "private";
 
 export interface ClientOption {

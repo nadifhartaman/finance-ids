@@ -1,10 +1,11 @@
+import AddExpenseButton from "@/components/budgets/AddExpenseButton";
 import BudgetInsights from "@/components/budgets/BudgetInsights";
 import BudgetList from "@/components/budgets/BudgetList";
 import BudgetProgressRing from "@/components/budgets/BudgetProgressRing";
 import BudgetScopeSelect from "@/components/budgets/BudgetScopeSelect";
 import BudgetSummaryCards from "@/components/budgets/BudgetSummaryCards";
 import { getRequiredUser } from "@/lib/auth";
-import { getBudgets } from "@/lib/api";
+import { getBudgets, getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
 
 export default async function BudgetsPage({
@@ -19,8 +20,13 @@ export default async function BudgetsPage({
       ? scopeParam
       : undefined;
 
-  const [user, budgets] = await Promise.all([getRequiredUser(), getBudgets(requestedScope)]);
+  const [user, budgets, { projects: allProjects }] = await Promise.all([
+    getRequiredUser(),
+    getBudgets(requestedScope),
+    getProjects(),
+  ]);
   const canEdit = can(user.role, "budgets.edit");
+  const canLogExpense = can(user.role, "spending.write");
   const {
     scope,
     availableMonths,
@@ -62,9 +68,16 @@ export default async function BudgetsPage({
 
         <div className="space-y-6 lg:col-span-2">
           <section>
-            <h2 className="text-lg font-semibold text-title">
-              Spending by category — {scope.label}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-title">
+                Spending by category — {scope.label}
+              </h2>
+              {canLogExpense && (
+                <AddExpenseButton
+                  projects={allProjects.map((p) => ({ id: p.id, name: p.name, client: p.client }))}
+                />
+              )}
+            </div>
             <div className="mt-3">
               <BudgetList
                 items={categoryBudgets}
