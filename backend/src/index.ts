@@ -10,10 +10,12 @@ import { usersRouter } from "./routes/users.js";
 import { notesRouter } from "./routes/notes.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { clientsRouter } from "./routes/clients.js";
+import { partnersRouter } from "./routes/partners.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { invoicesRouter } from "./routes/invoices.js";
 import { projectsRouter } from "./routes/projects.js";
 import { trendsRouter } from "./routes/trends.js";
+import { accountingRouter } from "./routes/accounting.js";
 
 const app = express();
 
@@ -42,8 +44,10 @@ app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/invoices", requireAuth, invoicesRouter);
 app.use("/api/projects", requireAuth, projectsRouter);
 app.use("/api/clients", requireAuth, clientsRouter);
+app.use("/api/partners", requireAuth, partnersRouter);
 app.use("/api/budgets", requireAuth, budgetsRouter);
 app.use("/api/trends", requireAuth, trendsRouter);
+app.use("/api/accounting", requireAuth, accountingRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });

@@ -58,7 +58,7 @@ export async function fetchInvoices(): Promise<InvoiceRow[]> {
     .from("invoices")
     .select(
       `id, invoice_number, amount, amount_paid, issued_date, due_date, paid_date, voided_at,
-       project:projects!inner ( id, name, product_line, client:clients!inner ( name, client_type ) )`,
+       project:projects!inner ( id, name, product_line, client:partners!inner ( name, client_type ) )`,
     )
     .order("issued_date");
   if (error) throw error;
@@ -66,6 +66,8 @@ export async function fetchInvoices(): Promise<InvoiceRow[]> {
 }
 
 export interface InvoiceFactsRow {
+  invoice_number: string;
+  partner_id: string;
   amount: number;
   amount_paid: number;
   issued_date: string;
@@ -78,7 +80,7 @@ export interface InvoiceFactsRow {
 export async function fetchInvoiceById(id: string): Promise<InvoiceFactsRow | null> {
   const { data, error } = await supabase
     .from("invoices")
-    .select("amount, amount_paid, issued_date, due_date, paid_date, voided_at")
+    .select("invoice_number, partner_id, amount, amount_paid, issued_date, due_date, paid_date, voided_at")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -97,7 +99,11 @@ export async function fetchClients(): Promise<ClientRow[]> {
     .select("id, name, client_type")
     .order("name");
   if (error) throw error;
-  return data;
+  // The `clients` view is filtered to partners.is_customer — every row it
+  // returns went through a create path that requires client_type, so this
+  // is never actually null in practice; the column is only nullable at the
+  // partners level because vendors/employees/lenders don't have one.
+  return data.map((row) => ({ ...row, client_type: row.client_type as ClientType }));
 }
 
 export interface ProjectRow {
@@ -115,7 +121,7 @@ export async function fetchProjects(): Promise<ProjectRow[]> {
     .from("projects")
     .select(
       `id, name, product_line, contract_value, budget, is_flagged,
-       client:clients!inner ( name, client_type )`,
+       client:partners!inner ( name, client_type )`,
     )
     .order("name");
   if (error) throw error;
@@ -129,10 +135,11 @@ export async function fetchProjectById(id: string): Promise<{
   contract_value: number;
   budget: number | null;
   is_flagged: boolean;
+  partner_id: string;
 } | null> {
   const { data, error } = await supabase
     .from("projects")
-    .select("name, product_line, contract_value, budget, is_flagged")
+    .select("name, product_line, contract_value, budget, is_flagged, partner_id")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -162,6 +169,87 @@ export async function fetchExpenses(): Promise<ExpenseRow[]> {
   const { data, error } = await supabase
     .from("expenses")
     .select("category, project_id, amount, spent_on");
+  if (error) throw error;
+  return data;
+}
+
+export interface ExpenseFactsRow {
+  category: ExpenseCategory;
+  project_id: string | null;
+  partner_id: string | null;
+  description: string;
+  amount: number;
+  spent_on: string;
+  due_date: string | null;
+  voided_at: string | null;
+}
+
+/** Lightweight single-expense read for capturing "before" state ahead of a write — see mutations.ts. */
+export async function fetchExpenseById(id: string): Promise<ExpenseFactsRow | null> {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select("category, project_id, partner_id, description, amount, spent_on, due_date, voided_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Outstanding balance on a vendor bill: amount minus everything allocated to it via payment_allocations. */
+export async function fetchExpenseOutstanding(expenseId: string): Promise<number> {
+  const [{ data: expense, error: expenseError }, { data: allocations, error: allocationsError }] =
+    await Promise.all([
+      supabase.from("expenses").select("amount").eq("id", expenseId).single(),
+      supabase.from("payment_allocations").select("amount").eq("expense_id", expenseId),
+    ]);
+  if (expenseError) throw expenseError;
+  if (allocationsError) throw allocationsError;
+  const paid = allocations.reduce((s, a) => s + a.amount, 0);
+  return expense.amount - paid;
+}
+
+/** Outstanding principal on a loan: Σ disbursement - Σ principal_repayment — same formula fetchDebtOutstanding uses. */
+export async function fetchLoanOutstanding(loanId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("loan_transactions")
+    .select("type, amount")
+    .eq("loan_id", loanId);
+  if (error) throw error;
+  return data.reduce((s, t) => {
+    if (t.type === "disbursement") return s + t.amount;
+    if (t.type === "principal_repayment") return s - t.amount;
+    return s;
+  }, 0);
+}
+
+export interface PartnerRow {
+  id: string;
+  name: string;
+  client_type: ClientType | null;
+  is_customer: boolean;
+  is_vendor: boolean;
+  is_employee: boolean;
+  is_lender: boolean;
+  is_active: boolean;
+  tax_id: string | null;
+}
+
+type PartnerRole = "customer" | "vendor" | "employee" | "lender";
+
+const PARTNER_ROLE_COLUMN: Record<PartnerRole, "is_customer" | "is_vendor" | "is_employee" | "is_lender"> = {
+  customer: "is_customer",
+  vendor: "is_vendor",
+  employee: "is_employee",
+  lender: "is_lender",
+};
+
+export async function fetchPartners(role?: PartnerRole): Promise<PartnerRow[]> {
+  let query = supabase
+    .from("partners")
+    .select("id, name, client_type, is_customer, is_vendor, is_employee, is_lender, is_active, tax_id")
+    .order("name");
+  if (role) query = query.eq(PARTNER_ROLE_COLUMN[role], true);
+  const { data, error } = await query;
   if (error) throw error;
   return data;
 }

@@ -14,6 +14,19 @@ import {
 import { logAudit } from "./audit.js";
 import { formatRupiah } from "./format.js";
 import type { Database } from "../types/database.js";
+import { resolveAccount, resolveJournal } from "./accounting/coa.js";
+import {
+  postInvoiceEntry,
+  postInvoicePaymentEntry,
+  postExpenseEntry,
+  postVendorBillEntry,
+  postVendorPaymentEntry,
+  postLoanDisbursementEntry,
+  postLoanRepaymentEntry,
+  postLoanInterestEntry,
+  postReversalEntry,
+} from "./accounting/posting.js";
+import { fetchExpenseById, fetchExpenseOutstanding, fetchLoanOutstanding } from "./queries.js";
 
 export type ExpenseCategory = Database["public"]["Enums"]["expense_category"];
 export type ProductLine = Database["public"]["Enums"]["product_line"];
@@ -141,11 +154,15 @@ export interface CreateInvoiceInput {
 }
 
 export async function createInvoice(input: CreateInvoiceInput, actorId: string): Promise<{ id: string }> {
+  const project = await fetchProjectById(input.projectId);
+  if (!project) throw new Error("Project not found");
+
   const { data, error } = await supabase
     .from("invoices")
     .insert({
       invoice_number: input.invoiceNumber,
       project_id: input.projectId,
+      partner_id: project.partner_id,
       amount: input.amount,
       issued_date: input.issuedDate,
       due_date: input.dueDate,
@@ -153,6 +170,16 @@ export async function createInvoice(input: CreateInvoiceInput, actorId: string):
     .select("id")
     .single();
   if (error) throw new Error(error.message);
+
+  await postInvoiceEntry({
+    invoiceId: data.id,
+    invoiceNumber: input.invoiceNumber,
+    partnerId: project.partner_id,
+    projectId: input.projectId,
+    amount: input.amount,
+    issuedDate: input.issuedDate,
+    actorId,
+  });
 
   await logAudit({
     userId: actorId,
@@ -169,6 +196,183 @@ export async function createInvoice(input: CreateInvoiceInput, actorId: string):
     },
   });
   return { id: data.id };
+}
+
+export interface CreateExpenseInput {
+  category: ExpenseCategory;
+  projectId: string | null;
+  description: string;
+  amount: number;
+  spentOn: string;
+  /** Vendor for a vendor bill — required iff dueDate is set, ignored (must be null) for a cash expense. */
+  partnerId?: string | null;
+  /** null => cash expense (Dr Expense / Cr Bank, posted now). Set => vendor bill (Dr Expense / Cr A/P), settled later via recordExpensePayment. */
+  dueDate?: string | null;
+}
+
+export async function createExpense(input: CreateExpenseInput, actorId: string): Promise<{ id: string }> {
+  const isVendorBill = !!input.dueDate;
+  const { data, error } = await supabase
+    .from("expenses")
+    .insert({
+      category: input.category,
+      project_id: input.projectId,
+      description: input.description,
+      amount: input.amount,
+      spent_on: input.spentOn,
+      partner_id: isVendorBill ? (input.partnerId ?? null) : null,
+      due_date: input.dueDate ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  if (isVendorBill) {
+    if (!input.partnerId) throw new Error("partnerId is required for a vendor bill (dueDate set)");
+    await postVendorBillEntry({
+      expenseId: data.id,
+      category: input.category,
+      projectId: input.projectId,
+      partnerId: input.partnerId,
+      description: input.description,
+      amount: input.amount,
+      spentOn: input.spentOn,
+      actorId,
+    });
+  } else {
+    await postExpenseEntry({
+      expenseId: data.id,
+      category: input.category,
+      projectId: input.projectId,
+      partnerId: null,
+      description: input.description,
+      amount: input.amount,
+      spentOn: input.spentOn,
+      actorId,
+    });
+  }
+
+  await logAudit({
+    userId: actorId,
+    action: "create",
+    entity: "expense",
+    entityId: data.id,
+    before: null,
+    after: {
+      category: input.category,
+      projectId: input.projectId,
+      description: input.description,
+      amount: input.amount,
+      spentOn: input.spentOn,
+      partnerId: isVendorBill ? (input.partnerId ?? null) : null,
+      dueDate: input.dueDate ?? null,
+    },
+  });
+  return { id: data.id };
+}
+
+/** Caller must already have verified this expense has no payment allocations — the same guard voidInvoice applies to amount_paid. */
+export async function voidExpense(id: string, actorId: string): Promise<void> {
+  const before = await fetchExpenseById(id);
+  if (!before) throw new Error("Expense not found");
+  if (before.voided_at) throw new Error("This expense is already voided");
+  const outstanding = await fetchExpenseOutstanding(id);
+  if (before.due_date && outstanding < before.amount) {
+    throw new Error("This vendor bill has payments recorded against it — it can't be voided");
+  }
+
+  const voidedAt = getToday().toISOString().slice(0, 10);
+  const { error } = await supabase.from("expenses").update({ voided_at: voidedAt }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  const { data: entry, error: entryError } = await supabase
+    .from("journal_entries")
+    .select("id")
+    .eq("source_type", "expense")
+    .eq("source_id", id)
+    .eq("status", "posted")
+    .maybeSingle();
+  if (entryError) throw new Error(entryError.message);
+  if (entry) {
+    await postReversalEntry(entry.id, voidedAt, actorId);
+  }
+
+  await logAudit({
+    userId: actorId,
+    action: "void",
+    entity: "expense",
+    entityId: id,
+    before: { voidedAt: before.voided_at },
+    after: { voidedAt },
+  });
+}
+
+/**
+ * Records a payment against a vendor bill (an expense with due_date set —
+ * cash expenses were already settled at creation and never take payments).
+ * Mirrors recordInvoicePayment but outbound: Dr Accounts Payable / Cr Bank.
+ */
+export async function recordExpensePayment(
+  expenseId: string,
+  amountPaid: number,
+  paymentDate: string,
+  actorId: string,
+): Promise<void> {
+  const before = await fetchExpenseById(expenseId);
+  if (!before) throw new Error("Expense not found");
+  if (!before.due_date) throw new Error("This is a cash expense, not a vendor bill — it has nothing outstanding");
+  if (before.voided_at) throw new Error("This vendor bill was voided — it can't receive payments");
+  if (!before.partner_id) throw new Error("This vendor bill has no vendor on record");
+  const partnerId = before.partner_id;
+
+  const outstanding = await fetchExpenseOutstanding(expenseId);
+  if (amountPaid > outstanding) {
+    throw new Error(`That's more than what's left on this bill — ${formatRupiah(outstanding)} outstanding`);
+  }
+  if (amountPaid <= 0) throw new Error("amountPaid must be positive");
+
+  const [bankAccountId, journalId] = await Promise.all([
+    resolveAccount("default_bank"),
+    resolveJournal("BNK1"),
+  ]);
+  const { data: payment, error: paymentError } = await supabase
+    .from("payments")
+    .insert({
+      payment_number: `PMT-${before.description.slice(0, 20)}-${Date.now()}`,
+      direction: "outbound",
+      partner_id: partnerId,
+      bank_account_id: bankAccountId,
+      journal_id: journalId,
+      payment_date: paymentDate,
+      amount: amountPaid,
+      created_by: actorId,
+    })
+    .select("id")
+    .single();
+  if (paymentError) throw new Error(paymentError.message);
+
+  const { error: allocationError } = await supabase
+    .from("payment_allocations")
+    .insert({ payment_id: payment.id, expense_id: expenseId, amount: amountPaid });
+  if (allocationError) throw new Error(allocationError.message);
+
+  await postVendorPaymentEntry({
+    paymentId: payment.id,
+    partnerId,
+    description: before.description,
+    amount: amountPaid,
+    paymentDate,
+    actorId,
+  });
+
+  await logAudit({
+    userId: actorId,
+    action: "payment",
+    entity: "expense",
+    entityId: expenseId,
+    before: { outstanding },
+    after: { outstanding: outstanding - amountPaid, amountPaid },
+  });
 }
 
 export interface UpdateInvoiceInput {
@@ -207,6 +411,21 @@ export async function voidInvoice(id: string, actorId: string): Promise<void> {
   const voidedAt = getToday().toISOString().slice(0, 10);
   const { error } = await supabase.from("invoices").update({ voided_at: voidedAt }).eq("id", id);
   if (error) throw error;
+
+  // Reverse the invoice's A/R and revenue — a voided invoice contributed
+  // nothing to cash (guarded by amount_paid === 0 above), so the ledger
+  // shouldn't keep carrying it either.
+  const { data: entry, error: entryError } = await supabase
+    .from("journal_entries")
+    .select("id")
+    .eq("source_type", "invoice")
+    .eq("source_id", id)
+    .eq("status", "posted")
+    .maybeSingle();
+  if (entryError) throw new Error(entryError.message);
+  if (entry) {
+    await postReversalEntry(entry.id, voidedAt, actorId);
+  }
 
   await logAudit({
     userId: actorId,
@@ -253,6 +472,40 @@ export async function recordInvoicePayment(
     .eq("id", id);
   if (error) throw new Error(error.message);
 
+  const [bankAccountId, journalId] = await Promise.all([
+    resolveAccount("default_bank"),
+    resolveJournal("BNK1"),
+  ]);
+  const { data: payment, error: paymentError } = await supabase
+    .from("payments")
+    .insert({
+      payment_number: `PMT-${before.invoice_number}-${Date.now()}`,
+      direction: "inbound",
+      partner_id: before.partner_id,
+      bank_account_id: bankAccountId,
+      journal_id: journalId,
+      payment_date: receivedDate,
+      amount: amountReceived,
+      created_by: actorId,
+    })
+    .select("id")
+    .single();
+  if (paymentError) throw new Error(paymentError.message);
+
+  const { error: allocationError } = await supabase
+    .from("payment_allocations")
+    .insert({ payment_id: payment.id, invoice_id: id, amount: amountReceived });
+  if (allocationError) throw new Error(allocationError.message);
+
+  await postInvoicePaymentEntry({
+    paymentId: payment.id,
+    invoiceNumber: before.invoice_number,
+    partnerId: before.partner_id,
+    amount: amountReceived,
+    paymentDate: receivedDate,
+    actorId,
+  });
+
   await logAudit({
     userId: actorId,
     action: "payment",
@@ -263,13 +516,221 @@ export async function recordInvoicePayment(
   });
 }
 
+export interface CreateLoanInput {
+  reference: string;
+  lenderPartnerId: string;
+  liabilityAccountId: string;
+  principalAmount: number;
+  interestRatePct?: number | null;
+  startDate: string;
+  maturityDate?: string | null;
+}
+
+/** Creates the loan and immediately disburses the full principal: Dr Bank / Cr the loan's liability account. */
+export async function createLoan(input: CreateLoanInput, actorId: string): Promise<{ id: string }> {
+  const { data: account, error: accountError } = await supabase
+    .from("accounts")
+    .select("id, subtype")
+    .eq("id", input.liabilityAccountId)
+    .maybeSingle();
+  if (accountError) throw new Error(accountError.message);
+  if (!account || account.subtype !== "loan") {
+    throw new Error("liabilityAccountId must reference an account with subtype 'loan'");
+  }
+
+  const { data: loan, error: loanError } = await supabase
+    .from("loans")
+    .insert({
+      reference: input.reference,
+      lender_partner_id: input.lenderPartnerId,
+      liability_account_id: input.liabilityAccountId,
+      principal_amount: input.principalAmount,
+      interest_rate_pct: input.interestRatePct ?? null,
+      start_date: input.startDate,
+      maturity_date: input.maturityDate ?? null,
+    })
+    .select("id")
+    .single();
+  if (loanError) throw new Error(loanError.message);
+
+  const { data: txn, error: txnError } = await supabase
+    .from("loan_transactions")
+    .insert({
+      loan_id: loan.id,
+      type: "disbursement",
+      txn_date: input.startDate,
+      amount: input.principalAmount,
+      created_by: actorId,
+    })
+    .select("id")
+    .single();
+  if (txnError) throw new Error(txnError.message);
+
+  await postLoanDisbursementEntry({
+    loanTransactionId: txn.id,
+    reference: input.reference,
+    lenderPartnerId: input.lenderPartnerId,
+    liabilityAccountId: input.liabilityAccountId,
+    amount: input.principalAmount,
+    txnDate: input.startDate,
+    actorId,
+  });
+
+  await logAudit({
+    userId: actorId,
+    action: "create",
+    entity: "loan",
+    entityId: loan.id,
+    before: null,
+    after: { reference: input.reference, principalAmount: input.principalAmount, startDate: input.startDate },
+  });
+  return { id: loan.id };
+}
+
+/**
+ * Records a repayment: principal reduces the liability, interest hits P&L.
+ * At least one of principalAmount/interestAmount must be positive. Each
+ * non-zero component posts its own balanced journal entry (both against
+ * Bank) — a loan repayment isn't a single indivisible document the way an
+ * invoice/expense is, so two entries here is not a modeling shortcut.
+ */
+export async function recordLoanRepayment(
+  loanId: string,
+  principalAmount: number,
+  interestAmount: number,
+  paymentDate: string,
+  actorId: string,
+): Promise<void> {
+  if (principalAmount < 0 || interestAmount < 0) throw new Error("Amounts must be non-negative");
+  if (principalAmount === 0 && interestAmount === 0) {
+    throw new Error("At least one of principalAmount/interestAmount must be positive");
+  }
+
+  const { data: loan, error: loanError } = await supabase
+    .from("loans")
+    .select("id, reference, lender_partner_id, liability_account_id, status")
+    .eq("id", loanId)
+    .maybeSingle();
+  if (loanError) throw new Error(loanError.message);
+  if (!loan) throw new Error("Loan not found");
+  if (loan.status === "cancelled") throw new Error("This loan was cancelled");
+
+  if (principalAmount > 0) {
+    const outstanding = await fetchLoanOutstanding(loanId);
+    if (principalAmount > outstanding) {
+      throw new Error(`That's more than the outstanding principal — ${formatRupiah(outstanding)} left`);
+    }
+  }
+
+  if (principalAmount > 0) {
+    const { data: txn, error: txnError } = await supabase
+      .from("loan_transactions")
+      .insert({
+        loan_id: loanId,
+        type: "principal_repayment",
+        txn_date: paymentDate,
+        amount: principalAmount,
+        created_by: actorId,
+      })
+      .select("id")
+      .single();
+    if (txnError) throw new Error(txnError.message);
+
+    await postLoanRepaymentEntry({
+      loanTransactionId: txn.id,
+      reference: loan.reference,
+      lenderPartnerId: loan.lender_partner_id,
+      liabilityAccountId: loan.liability_account_id,
+      amount: principalAmount,
+      txnDate: paymentDate,
+      actorId,
+    });
+  }
+
+  if (interestAmount > 0) {
+    const { data: txn, error: txnError } = await supabase
+      .from("loan_transactions")
+      .insert({
+        loan_id: loanId,
+        type: "interest_payment",
+        txn_date: paymentDate,
+        amount: interestAmount,
+        created_by: actorId,
+      })
+      .select("id")
+      .single();
+    if (txnError) throw new Error(txnError.message);
+
+    await postLoanInterestEntry({
+      loanTransactionId: txn.id,
+      reference: loan.reference,
+      amount: interestAmount,
+      txnDate: paymentDate,
+      actorId,
+    });
+  }
+
+  await logAudit({
+    userId: actorId,
+    action: "payment",
+    entity: "loan",
+    entityId: loanId,
+    before: null,
+    after: { principalAmount, interestAmount, paymentDate },
+  });
+}
+
 export async function createClient(name: string, clientType: ClientType): Promise<{ id: string }> {
   const { data, error } = await supabase
-    .from("clients")
-    .insert({ name, client_type: clientType })
+    .from("partners")
+    .insert({ name, client_type: clientType, is_customer: true })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
+  return { id: data.id };
+}
+
+export interface CreatePartnerInput {
+  name: string;
+  clientType?: ClientType | null;
+  isCustomer?: boolean;
+  isVendor?: boolean;
+  isEmployee?: boolean;
+  isLender?: boolean;
+  taxId?: string | null;
+}
+
+/** Generalizes createClient — the `partners_has_role` DB CHECK rejects an insert with every flag false. */
+export async function createPartner(input: CreatePartnerInput, actorId: string): Promise<{ id: string }> {
+  const { data, error } = await supabase
+    .from("partners")
+    .insert({
+      name: input.name,
+      client_type: input.clientType ?? null,
+      is_customer: input.isCustomer ?? false,
+      is_vendor: input.isVendor ?? false,
+      is_employee: input.isEmployee ?? false,
+      is_lender: input.isLender ?? false,
+      tax_id: input.taxId ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "create",
+    entity: "partner",
+    entityId: data.id,
+    before: null,
+    after: {
+      name: input.name,
+      isCustomer: input.isCustomer ?? false,
+      isVendor: input.isVendor ?? false,
+      isEmployee: input.isEmployee ?? false,
+      isLender: input.isLender ?? false,
+    },
+  });
   return { id: data.id };
 }
 
@@ -296,7 +757,7 @@ export async function createProject(
   const { data, error } = await supabase
     .from("projects")
     .insert({
-      client_id: clientId,
+      partner_id: clientId,
       name: input.name,
       product_line: input.productLine,
       contract_value: input.contractValue,
