@@ -15,6 +15,7 @@ const CACHE_TTL_MS = 30_000;
 
 let settingsCache: Map<string, string> | null = null;
 let journalsCache: Map<string, string> | null = null;
+let journalsByAccountCache: Map<string, string> | null = null;
 let loadedAt = 0;
 
 async function ensureLoaded(): Promise<void> {
@@ -22,7 +23,7 @@ async function ensureLoaded(): Promise<void> {
 
   const [settingsResult, journalsResult] = await Promise.all([
     supabase.from("accounting_settings").select("key, account_id"),
-    supabase.from("journals").select("code, id"),
+    supabase.from("journals").select("code, id, default_account_id"),
   ]);
   if (settingsResult.error) throw settingsResult.error;
   if (journalsResult.error) throw journalsResult.error;
@@ -33,12 +34,24 @@ async function ensureLoaded(): Promise<void> {
   }
   settingsCache = nextSettings;
   journalsCache = new Map(journalsResult.data.map((j) => [j.code, j.id]));
+  journalsByAccountCache = new Map(
+    journalsResult.data.filter((j) => j.default_account_id).map((j) => [j.default_account_id!, j.code]),
+  );
   loadedAt = Date.now();
 }
 
 export function invalidateAccountingCache(): void {
   settingsCache = null;
   journalsCache = null;
+  journalsByAccountCache = null;
+}
+
+/** Resolves a bank/cash account id (e.g. "Bank Mandiri") to the journal code that pays out of it — the reverse of resolveJournal. Used to route an expense's payment to the journal matching the account the accountant actually picked, instead of always BNK1. */
+export async function resolveJournalCodeForAccount(accountId: string): Promise<string> {
+  await ensureLoaded();
+  const code = journalsByAccountCache?.get(accountId);
+  if (!code) throw new Error(`No journal has account "${accountId}" as its default account`);
+  return code;
 }
 
 /** Resolves an `accounting_settings.key` (e.g. "ar_account") to its mapped account id. */

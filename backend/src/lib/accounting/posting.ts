@@ -14,7 +14,7 @@
  */
 import { supabase } from "../supabase.js";
 import type { Database } from "../../types/database.js";
-import { resolveAccount, resolveJournal, expenseAccountKey } from "./coa.js";
+import { resolveAccount, resolveJournal, resolveJournalCodeForAccount, expenseAccountKey } from "./coa.js";
 
 type EntrySource = Database["public"]["Enums"]["entry_source"];
 type ExpenseCategory = Database["public"]["Enums"]["expense_category"];
@@ -39,6 +39,8 @@ export interface PostEntryInput {
   reversalOfId?: string | null;
   lines: PostingLine[];
   actorId: string;
+  /** "draft" leaves the entry editable and out of every report (reports filter status='posted'); omitted = "posted", unchanged from before draft support existed. Every document-specific poster below omits this — only the manual journal-entry editor uses "draft". */
+  status?: "draft" | "posted";
 }
 
 export interface PostedEntry {
@@ -46,15 +48,18 @@ export interface PostedEntry {
   entryNumber: string;
 }
 
-/** Inserts a draft entry + its lines, then posts it — the single gate every document-specific poster below goes through. Runs as one atomic RPC (see 0009_post_journal_entry_atomic.sql). */
+/** Inserts an entry + its lines, then posts it unless `status: "draft"` was requested — the single gate every document-specific poster below goes through. Runs as one atomic RPC (see 0009_post_journal_entry_atomic.sql, extended by 0013 for draft support). */
 export async function postEntry(input: PostEntryInput): Promise<PostedEntry> {
-  if (input.lines.length < 2) {
-    throw new Error(`Journal entry needs at least 2 lines, got ${input.lines.length}`);
-  }
-  const totalDebit = input.lines.reduce((s, l) => s + l.debit, 0);
-  const totalCredit = input.lines.reduce((s, l) => s + l.credit, 0);
-  if (totalDebit !== totalCredit) {
-    throw new Error(`Journal entry is not balanced: debit ${totalDebit} <> credit ${totalCredit}`);
+  const status = input.status ?? "posted";
+  if (status === "posted") {
+    if (input.lines.length < 2) {
+      throw new Error(`Journal entry needs at least 2 lines, got ${input.lines.length}`);
+    }
+    const totalDebit = input.lines.reduce((s, l) => s + l.debit, 0);
+    const totalCredit = input.lines.reduce((s, l) => s + l.credit, 0);
+    if (totalDebit !== totalCredit) {
+      throw new Error(`Journal entry is not balanced: debit ${totalDebit} <> credit ${totalCredit}`);
+    }
   }
   if (input.sourceType !== "manual" && !input.sourceId) {
     throw new Error(`sourceId is required for sourceType "${input.sourceType}"`);
@@ -80,11 +85,111 @@ export async function postEntry(input: PostEntryInput): Promise<PostedEntry> {
       debit: line.debit,
       credit: line.credit,
     })),
+    p_status: status,
   });
   if (error) throw new Error(error.message);
   const row = data[0];
   if (!row) throw new Error("post_journal_entry returned no row");
   return { id: row.id, entryNumber: row.entry_number };
+}
+
+/**
+ * Flips a draft entry to posted. A plain UPDATE, not the RPC above (there's
+ * no new entry_number to allocate) — `trg_je_balanced` (0002) fires on
+ * exactly this transition and does the real validation (>=2 lines,
+ * debit=credit, fiscal period open), so this function's job is just to
+ * scope the update to a draft row and surface the trigger's rejection as a
+ * normal error. Throws the literal "Entry not found or not a draft" (same
+ * message as cancelDraftEntry) when the row didn't match — routes match on
+ * that string to answer 409 instead of guessing from a PostgREST error code.
+ */
+export async function postDraftEntry(id: string, actorId: string): Promise<PostedEntry> {
+  const { data, error } = await supabase
+    .from("journal_entries")
+    .update({ status: "posted", posted_by: actorId })
+    .eq("id", id)
+    .eq("status", "draft")
+    .select("id, entry_number")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Entry not found or not a draft");
+  return { id: data.id, entryNumber: data.entry_number };
+}
+
+/**
+ * Cancels a draft entry in place — no DB trigger blocks a draft->cancelled
+ * transition (only posted rows are immutable), so this is a plain UPDATE.
+ * A posted entry must be reversed instead (postReversalEntry below); the
+ * caller is responsible for routing to the right one based on status.
+ */
+export async function cancelDraftEntry(id: string, actorId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("journal_entries")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Entry not found or not a draft");
+  void actorId; // no audit trail on journal_entries yet — kept for a consistent call signature with the rest of this module
+}
+
+/**
+ * Replaces every line on a draft entry (delete + reinsert, both allowed by
+ * `trg_je_lines_immutable` while the entry is still draft) and optionally
+ * its header fields. Deliberately does not require the lines to balance —
+ * Odoo allows saving an unbalanced draft; `trg_je_balanced` is the real gate
+ * and only fires when postDraftEntry flips it to posted.
+ */
+export async function updateDraftEntry(
+  id: string,
+  patch: {
+    journalCode?: string;
+    accountingDate?: string;
+    reference?: string | null;
+    description?: string;
+    lines?: PostingLine[];
+  },
+): Promise<void> {
+  const { data: existing, error: fetchError } = await supabase
+    .from("journal_entries")
+    .select("id, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchError) throw new Error(fetchError.message);
+  if (!existing) throw new Error("Entry not found");
+  if (existing.status !== "draft") throw new Error("Only a draft entry can be edited");
+
+  const headerPatch: Database["public"]["Tables"]["journal_entries"]["Update"] = {};
+  if (patch.accountingDate !== undefined) headerPatch.accounting_date = patch.accountingDate;
+  if (patch.reference !== undefined) headerPatch.reference = patch.reference;
+  if (patch.description !== undefined) headerPatch.description = patch.description;
+  if (patch.journalCode !== undefined) headerPatch.journal_id = await resolveJournal(patch.journalCode);
+
+  if (Object.keys(headerPatch).length > 0) {
+    const { error } = await supabase.from("journal_entries").update(headerPatch).eq("id", id);
+    if (error) throw new Error(error.message);
+  }
+
+  if (patch.lines) {
+    const { error: deleteError } = await supabase.from("journal_entry_lines").delete().eq("journal_entry_id", id);
+    if (deleteError) throw new Error(deleteError.message);
+
+    const { error: insertError } = await supabase.from("journal_entry_lines").insert(
+      patch.lines.map((line, i) => ({
+        journal_entry_id: id,
+        line_no: i + 1,
+        account_id: line.accountId,
+        partner_id: line.partnerId ?? null,
+        project_id: line.projectId ?? null,
+        description: line.description ?? null,
+        debit: line.debit,
+        credit: line.credit,
+      })),
+    );
+    if (insertError) throw new Error(insertError.message);
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -181,13 +286,16 @@ export async function postExpenseEntry(params: {
   amount: number;
   spentOn: string;
   actorId: string;
+  /** Which bank/cash account the money actually left from. Omitted falls back to the default bank (Bank BCA / BNK1) for backwards compatibility. */
+  paidFromAccountId?: string | null;
 }): Promise<PostedEntry> {
   const [expenseAccount, bankAccount] = await Promise.all([
     resolveAccount(expenseAccountKey(params.category)),
-    resolveAccount("default_bank"),
+    params.paidFromAccountId ? Promise.resolve(params.paidFromAccountId) : resolveAccount("default_bank"),
   ]);
+  const journalCode = await resolveJournalCodeForAccount(bankAccount);
   return postEntry({
-    journalCode: "BNK1",
+    journalCode,
     accountingDate: params.spentOn,
     description: params.description,
     sourceType: "expense",
