@@ -9,9 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { BudgetItem } from "@/lib/types";
+import type { BudgetItem, ExpenseCategory } from "@/lib/types";
 import { formatRupiah } from "@/lib/format";
 import { updateCategoryBudget, updateProjectBudgetAmount } from "@/lib/budgets-actions";
+import { expensesLaneRoute } from "@/lib/routes";
 import BudgetItemCard from "./BudgetItemCard";
 
 /**
@@ -28,6 +29,8 @@ export default function BudgetList({
   layout = "stack",
   noPlanHint,
   initialCount,
+  linkToExpenses,
+  draftCounts,
 }: {
   items: BudgetItem[];
   canEdit: boolean;
@@ -37,6 +40,10 @@ export default function BudgetList({
   noPlanHint?: string;
   /** Collapse to this many items behind a "Show all" toggle when there are more. */
   initialCount?: number;
+  /** When true (category kind only), each card links to its filtered expense lane. */
+  linkToExpenses?: boolean;
+  /** Draft-expense counts per category, rendered as a "N drafts waiting" footnote. */
+  draftCounts?: Record<ExpenseCategory, number>;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<BudgetItem | null>(null);
@@ -80,14 +87,32 @@ export default function BudgetList({
           layout === "grid" ? "grid gap-4 sm:grid-cols-2" : "space-y-4"
         }
       >
-        {visibleItems.map((item) => (
-          <BudgetItemCard
-            key={item.id}
-            item={item}
-            onEdit={canEdit ? () => openEditor(item) : undefined}
-            noPlanHint={noPlanHint}
-          />
-        ))}
+        {visibleItems.map((item) => {
+          const category = item.id.replace(/^cat-/, "") as ExpenseCategory;
+          const drafts = kind === "category" ? draftCounts?.[category] ?? 0 : 0;
+
+          return (
+            <BudgetItemCard
+              key={item.id}
+              item={item}
+              onEdit={canEdit ? () => openEditor(item) : undefined}
+              noPlanHint={noPlanHint}
+              href={
+                kind === "category" && linkToExpenses
+                  ? expensesLaneRoute(category)
+                  : undefined
+              }
+              linkLabel="View expenses →"
+              footnote={
+                drafts > 0 ? (
+                  <p className="mt-3 text-xs font-medium text-primary-700">
+                    {drafts} draft{drafts === 1 ? "" : "s"} waiting to be posted
+                  </p>
+                ) : null
+              }
+            />
+          );
+        })}
       </div>
 
       {canCollapse && (

@@ -10,7 +10,7 @@ export async function updateCategoryBudget(
   return patchAction(
     `/api/budgets/categories/${category}`,
     { plannedAmount },
-    ["/budgets", "/"],
+    ["/money-out", "/"],
     "Failed to update budget.",
   );
 }
@@ -19,5 +19,5 @@ export async function updateProjectBudgetAmount(
   id: string,
   budget: number,
 ): Promise<{ error: string | null }> {
-  return patchAction(`/api/projects/${id}/budget`, { budget }, ["/budgets", "/"], "Failed to update budget.");
+  return patchAction(`/api/projects/${id}/budget`, { budget }, ["/money-out", "/"], "Failed to update budget.");
 }

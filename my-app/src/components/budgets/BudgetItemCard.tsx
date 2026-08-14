@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { Chip, type ChipColor } from "@/components/ui/chip";
 import type { BudgetHealthKind, BudgetItem } from "@/lib/types";
 import { formatRupiah } from "@/lib/format";
@@ -18,12 +20,20 @@ export default function BudgetItemCard({
   item,
   onEdit,
   noPlanHint,
+  href,
+  linkLabel,
+  footnote,
 }: {
   item: BudgetItem;
   /** Renders an "Edit budget" affordance; only passed for roles with `budgets.edit`. */
   onEdit?: () => void;
   /** Shown instead of a health chip when the item has no plan in this scope. */
   noPlanHint?: string;
+  /** Drill-down link, rendered as its own row below the health bar — kept out of the card's own click target so it never nests inside the Edit button. */
+  href?: string;
+  linkLabel?: string;
+  /** Extra line under the health bar, e.g. a "N drafts waiting" count. */
+  footnote?: ReactNode;
 }) {
   const health = item.health;
 
@@ -83,6 +93,17 @@ export default function BudgetItemCard({
             </span>
           </div>
         </>
+      )}
+
+      {footnote}
+
+      {href && (
+        <Link
+          href={href}
+          className="mt-3 block text-sm font-medium text-primary-700 hover:underline"
+        >
+          {linkLabel ?? "View transactions →"}
+        </Link>
       )}
     </article>
   );
