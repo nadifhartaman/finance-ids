@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SearchIcon } from "@/components/shell/icons";
 import {
@@ -12,24 +13,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Chip, type ChipColor } from "@/components/ui/chip";
-import type { Invoice, InvoiceStatusKind, ProjectOption } from "@/lib/types";
+import { Pagination } from "@/components/ui/pagination";
+import type { Invoice, InvoiceStatusKind } from "@/lib/types";
 import { formatDate, formatRupiah } from "@/lib/format";
 import { voidInvoice } from "@/lib/invoices-actions";
-import InvoiceFormDialog from "./InvoiceFormDialog";
+import { APP_ROUTES, invoiceRoute } from "@/lib/routes";
 import RecordPaymentDialog from "./RecordPaymentDialog";
 
 const ROWS_PER_PAGE = 8;
 
 const STATUS_FILTERS: { value: InvoiceStatusKind | "all"; label: string }[] = [
   { value: "all", label: "All status" },
+  { value: "draft", label: "Draft" },
   { value: "paid", label: "Paid" },
   { value: "awaiting", label: "Waiting for payment" },
   { value: "overdue", label: "Overdue" },
   { value: "partially-paid", label: "Partially paid" },
-  { value: "void", label: "Cancelled" },
+  { value: "void", label: "Voided" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 const STATUS_CHIP_COLOR: Record<InvoiceStatusKind, ChipColor> = {
+  draft: "primary",
+  cancelled: "gray",
   paid: "success",
   awaiting: "gray",
   overdue: "error",
@@ -74,13 +80,10 @@ function downloadCsv(rows: Invoice[]) {
 export default function InvoiceTable({
   invoices,
   canWrite = false,
-  projects = [],
 }: {
   invoices: Invoice[];
-  /** Shows add/edit/void affordances; only passed for roles with `invoices.write`. */
+  /** Shows new/edit/void affordances; only passed for roles with `invoices.write`. */
   canWrite?: boolean;
-  /** For the "New invoice" project dropdown; only needed when canWrite. */
-  projects?: ProjectOption[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -89,7 +92,6 @@ export default function InvoiceTable({
   );
   const [page, setPage] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
-  const [formTarget, setFormTarget] = useState<Invoice | "create" | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<Invoice | null>(null);
   const [isVoiding, startVoidTransition] = useTransition();
 
@@ -170,13 +172,12 @@ export default function InvoiceTable({
           Export CSV
         </button>
         {canWrite && (
-          <button
-            type="button"
-            onClick={() => setFormTarget("create")}
+          <Link
+            href={APP_ROUTES.newInvoice}
             className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
           >
             New invoice
-          </button>
+          </Link>
         )}
       </div>
 
@@ -216,8 +217,8 @@ export default function InvoiceTable({
             ) : (
               pageRows.map((invoice) => {
                 const status = invoice.status;
-                const isOpen = status.kind !== "void" && status.kind !== "paid";
-                const canVoid = isOpen;
+                const isOpen = !["void", "paid", "draft", "cancelled"].includes(status.kind);
+                const canVoid = isOpen && invoice.amountPaid === 0;
                 const canRecordPayment = isOpen;
                 return (
                   <TableRow key={invoice.id}>
@@ -247,13 +248,12 @@ export default function InvoiceTable({
                             Record payment
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setFormTarget(invoice)}
+                        <Link
+                          href={invoiceRoute(invoice.id)}
                           className="ml-1 rounded-md px-2 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
                         >
-                          Edit
-                        </button>
+                          {status.kind === "draft" ? "Edit" : "View"}
+                        </Link>
                         {canVoid && (
                           <button
                             type="button"
@@ -274,61 +274,14 @@ export default function InvoiceTable({
         </TableRoot>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-secondary">
-          {filtered.length === 0
-            ? "0 invoices"
-            : `Showing ${(currentPage - 1) * ROWS_PER_PAGE + 1}–${Math.min(
-                currentPage * ROWS_PER_PAGE,
-                filtered.length,
-              )} of ${filtered.length} invoices`}
-        </p>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="rounded-lg border border-card-border px-3 py-1.5 text-sm font-medium text-title disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-          {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setPage(n)}
-              aria-current={n === currentPage ? "page" : undefined}
-              className={`size-8 rounded-lg text-sm font-medium ${
-                n === currentPage
-                  ? "bg-primary-600 text-white"
-                  : "text-title hover:bg-soft"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            disabled={currentPage === pageCount}
-            className="rounded-lg border border-card-border px-3 py-1.5 text-sm font-medium text-title disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      {canWrite && (
-        <InvoiceFormDialog
-          key={formTarget === "create" ? "create" : (formTarget?.id ?? "closed")}
-          isOpen={formTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) setFormTarget(null);
-          }}
-          projects={projects}
-          invoice={formTarget === "create" ? undefined : (formTarget ?? undefined)}
-        />
-      )}
+      <Pagination
+        page={currentPage}
+        pageCount={pageCount}
+        total={filtered.length}
+        pageSize={ROWS_PER_PAGE}
+        itemLabel="invoices"
+        onPageChange={setPage}
+      />
 
       {canWrite && paymentTarget && (
         <RecordPaymentDialog
