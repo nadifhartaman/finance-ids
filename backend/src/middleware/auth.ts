@@ -51,6 +51,45 @@ export function invalidateProfileCache(id: string): void {
   profileCache.delete(id);
 }
 
+const TOKEN_CACHE_TTL_MS = 30_000;
+const TOKEN_CACHE_MAX = 500;
+const tokenCache = new Map<string, { userId: Promise<string | null>; expiresAt: number }>();
+
+/**
+ * The profile row was cached but the *token verification* wasn't, and that's
+ * the expensive half: `supabaseAuth.auth.getUser()` is a network round trip to
+ * Supabase Auth, measured at 120-900ms, paid before any data query runs. One
+ * Dashboard render fans out to ~9 API requests carrying the identical token,
+ * so it was re-verifying the same session nine times per page load.
+ *
+ * The cached value is the in-flight *promise*, not the resolved id — that's
+ * what collapses a burst of concurrent requests into a single round trip
+ * instead of letting all nine miss the cache together and stampede.
+ *
+ * Trade-off (same one profileCache already makes): a revoked or expired
+ * session stays accepted for up to TOKEN_CACHE_TTL_MS.
+ */
+function verifyToken(token: string): Promise<string | null> {
+  const cached = tokenCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) return cached.userId;
+
+  const userId = supabaseAuth.auth
+    .getUser(token)
+    .then(({ data, error }) => (error || !data.user ? null : data.user.id));
+
+  // A rejected verification must not be cached as a permanent failure.
+  userId.catch(() => tokenCache.delete(token));
+  tokenCache.set(token, { userId, expiresAt: Date.now() + TOKEN_CACHE_TTL_MS });
+
+  if (tokenCache.size > TOKEN_CACHE_MAX) {
+    const now = Date.now();
+    for (const [key, entry] of tokenCache) {
+      if (entry.expiresAt <= now) tokenCache.delete(key);
+    }
+  }
+  return userId;
+}
+
 /** Verifies the bearer token against Supabase Auth and loads the profile row. */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = bearerToken(req);
@@ -59,13 +98,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  const { data, error } = await supabaseAuth.auth.getUser(token);
-  if (error || !data.user) {
+  const userId = await verifyToken(token);
+  if (!userId) {
     res.status(401).json({ error: "Invalid or expired session" });
     return;
   }
 
-  const profile = await getCachedProfile(data.user.id);
+  const profile = await getCachedProfile(userId);
   if (!profile) {
     res.status(401).json({ error: "No profile for this account" });
     return;

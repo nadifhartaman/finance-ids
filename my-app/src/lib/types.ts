@@ -26,13 +26,23 @@ export interface AttentionItem {
   suggestedAction: string;
 }
 
-export type InvoiceStatusKind = "void" | "paid" | "overdue" | "partially-paid" | "awaiting";
+export type InvoiceStatusKind =
+  | "draft"
+  | "cancelled"
+  | "void"
+  | "paid"
+  | "overdue"
+  | "partially-paid"
+  | "awaiting";
 
 export interface InvoiceStatus {
   kind: InvoiceStatusKind;
   label: string;
   daysOverdue: number;
 }
+
+/** The stored lifecycle stage, separate from the derived payment/overdue InvoiceStatus above. */
+export type InvoiceDocStatus = "draft" | "posted" | "cancelled";
 
 export interface Invoice {
   id: string;
@@ -46,6 +56,24 @@ export interface Invoice {
   dueDate: string;
   paidDate?: string;
   status: InvoiceStatus;
+  documentStatus: InvoiceDocStatus;
+}
+
+/** GET /api/invoices/:id — the document detail/edit page's read, mirrors ExpenseDocument. */
+export interface InvoiceDocument {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  amountPaid: number;
+  issuedDate: string;
+  dueDate: string;
+  paidDate: string | null;
+  voidedAt: string | null;
+  status: InvoiceDocStatus;
+  postedAt: string | null;
+  projectId: string;
+  projectName: string;
+  clientName: string;
 }
 
 export interface DashboardUnpaidInvoice {
@@ -200,14 +228,6 @@ export interface ProjectOption {
 
 export type ExpenseCategory = "payroll" | "operations" | "project_costs";
 
-export interface Expense {
-  category: ExpenseCategory;
-  projectId: string | null;
-  description: string;
-  amount: number;
-  spentOn: string;
-}
-
 export type ClientType = "government" | "private";
 
 export interface ClientOption {
@@ -216,6 +236,185 @@ export interface ClientOption {
   clientType: ClientType;
 }
 
+export type ExpenseDocStatus = "draft" | "posted" | "cancelled";
+
+export interface ExpenseDocument {
+  id: string;
+  documentNumber: string | null;
+  category: ExpenseCategory;
+  status: ExpenseDocStatus;
+  description: string;
+  amount: number;
+  spentOn: string;
+  dueDate: string | null;
+  voidedAt: string | null;
+  partnerId: string | null;
+  partnerName: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  paidFromAccountId: string | null;
+  paidFromAccountName: string | null;
+}
+
+export interface ExpenseDocumentsResponse {
+  data: ExpenseDocument[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+export interface PartnerOption {
+  id: string;
+  name: string;
+  clientType: ClientType | null;
+  isCustomer: boolean;
+  isVendor: boolean;
+  isEmployee: boolean;
+  isLender: boolean;
+  isActive: boolean;
+  taxId: string | null;
+}
+
+export interface PartnersResponse {
+  partners: PartnerOption[];
+}
+
+export interface AccountOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  subtype: string;
+  parentId: string | null;
+  isPostable: boolean;
+  isActive: boolean;
+}
+
+export interface AccountsResponse {
+  accounts: AccountOption[];
+}
+
+export interface AttachmentItem {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  viewUrl: string;
+}
+
 export interface ClientsResponse {
   clients: ClientOption[];
 }
+
+// ----------------------------------------------------------------------------
+// Accounting — mirrors backend/src/lib/accounting/reports.ts response shapes.
+// The ledger (journal_entries/journal_entry_lines) is the source of truth;
+// these types describe read-only reports over it, nothing is derived
+// client-side from invoice/expense/project totals.
+// ----------------------------------------------------------------------------
+
+export interface FinancialSummary {
+  asOf: string | null;
+  assets: number;
+  liabilities: number;
+  equity: number;
+  revenue: number;
+  expenses: number;
+  netIncome: number;
+  cash: number;
+  receivables: number;
+  payables: number;
+}
+
+export type AgingBucketLabel = "current" | "1-30" | "31-60" | "61-90" | "90+";
+
+export interface AgingBucket {
+  label: AgingBucketLabel;
+  amount: number;
+}
+
+export interface PartnerAgingRow {
+  partnerId: string;
+  partnerName: string;
+  total: number;
+  current: number;
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  d90plus: number;
+}
+
+export interface AgingResponse {
+  asOf: string;
+  buckets: AgingBucket[];
+  partners: PartnerAgingRow[];
+}
+
+export type LoanStatus = "active" | "settled" | "cancelled";
+
+export interface DebtOutstandingRow {
+  loanId: string;
+  reference: string;
+  lenderName: string;
+  principalAmount: number;
+  outstandingPrincipal: number;
+  interestPaid: number;
+  status: string;
+  maturityDate: string | null;
+}
+
+export interface DebtResponse {
+  loans: DebtOutstandingRow[];
+}
+
+export interface MonthlyPLRow {
+  month: string;
+  revenue: number;
+  expenses: number;
+  netIncome: number;
+}
+
+export interface PlMonthlyResponse {
+  from: string;
+  to: string;
+  months: MonthlyPLRow[];
+}
+
+export type CashFlowGranularity = "day" | "week" | "month";
+
+export interface CashFlowBucket {
+  periodStart: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+  closing: number;
+}
+
+export interface CashFlowResponse {
+  from: string;
+  to: string;
+  granularity: CashFlowGranularity;
+  openingCash: number;
+  closingCash: number;
+  totalInflow: number;
+  totalOutflow: number;
+  netMovement: number;
+  buckets: CashFlowBucket[];
+}
+
+export interface ProjectProfitabilityRow {
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  marginPct: number | null;
+}
+
+export interface ProjectProfitabilityResponse {
+  asOf: string | null;
+  projects: ProjectProfitabilityRow[];
+}
+

@@ -188,12 +188,17 @@ export type Database = {
           category: Database["public"]["Enums"]["expense_category"]
           created_at: string
           description: string
+          document_number: string | null
           due_date: string | null
           expense_account_id: string | null
           id: string
+          paid_from_account_id: string | null
           partner_id: string | null
+          posted_at: string | null
+          posted_by: string | null
           project_id: string | null
           spent_on: string
+          status: Database["public"]["Enums"]["expense_status"]
           updated_at: string
           voided_at: string | null
         }
@@ -202,12 +207,17 @@ export type Database = {
           category: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           description: string
+          document_number?: string | null
           due_date?: string | null
           expense_account_id?: string | null
           id?: string
+          paid_from_account_id?: string | null
           partner_id?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
           project_id?: string | null
           spent_on: string
+          status?: Database["public"]["Enums"]["expense_status"]
           updated_at?: string
           voided_at?: string | null
         }
@@ -216,12 +226,17 @@ export type Database = {
           category?: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           description?: string
+          document_number?: string | null
           due_date?: string | null
           expense_account_id?: string | null
           id?: string
+          paid_from_account_id?: string | null
           partner_id?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
           project_id?: string | null
           spent_on?: string
+          status?: Database["public"]["Enums"]["expense_status"]
           updated_at?: string
           voided_at?: string | null
         }
@@ -245,6 +260,64 @@ export type Database = {
             columns: ["expense_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_paid_from_account_id_fkey"
+            columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_posted_by_fkey"
+            columns: ["posted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attachments: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          file_name: string
+          id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          file_name: string
+          id?: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          file_name?: string
+          id?: string
+          mime_type?: string
+          size_bytes?: number
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1016,11 +1089,16 @@ export type Database = {
           p_reversal_of_id?: string | null
           p_source_id?: string | null
           p_source_type: Database["public"]["Enums"]["entry_source"]
+          p_status?: Database["public"]["Enums"]["entry_status"]
         }
         Returns: {
           entry_number: string
           id: string
         }[]
+      }
+      next_expense_number: {
+        Args: { p_year: number }
+        Returns: string
       }
       fn_project_pl: {
         Args: { p_as_of?: string; p_project_id: string }
@@ -1089,6 +1167,7 @@ export type Database = {
         | "reversal"
       entry_status: "draft" | "posted" | "cancelled"
       expense_category: "payroll" | "operations" | "project_costs"
+      expense_status: "draft" | "posted" | "cancelled"
       journal_type: "sale" | "purchase" | "bank" | "cash" | "payroll" | "general"
       loan_status: "active" | "settled" | "cancelled"
       loan_txn_type:
@@ -1274,6 +1353,7 @@ export const Constants = {
       ],
       entry_status: ["draft", "posted", "cancelled"],
       expense_category: ["payroll", "operations", "project_costs"],
+      expense_status: ["draft", "posted", "cancelled"],
       journal_type: ["sale", "purchase", "bank", "cash", "payroll", "general"],
       loan_status: ["active", "settled", "cancelled"],
       loan_txn_type: [

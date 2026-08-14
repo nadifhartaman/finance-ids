@@ -153,6 +153,7 @@ export interface CreateInvoiceInput {
   dueDate: string;
 }
 
+/** Inserts a **draft** invoice — no ledger posting, no effect on revenue/AR reports (see postInvoice). */
 export async function createInvoice(input: CreateInvoiceInput, actorId: string): Promise<{ id: string }> {
   const project = await fetchProjectById(input.projectId);
   if (!project) throw new Error("Project not found");
@@ -166,20 +167,11 @@ export async function createInvoice(input: CreateInvoiceInput, actorId: string):
       amount: input.amount,
       issued_date: input.issuedDate,
       due_date: input.dueDate,
+      status: "draft",
     })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
-
-  await postInvoiceEntry({
-    invoiceId: data.id,
-    invoiceNumber: input.invoiceNumber,
-    partnerId: project.partner_id,
-    projectId: input.projectId,
-    amount: input.amount,
-    issuedDate: input.issuedDate,
-    actorId,
-  });
 
   await logAudit({
     userId: actorId,
@@ -193,9 +185,63 @@ export async function createInvoice(input: CreateInvoiceInput, actorId: string):
       amount: input.amount,
       issuedDate: input.issuedDate,
       dueDate: input.dueDate,
+      status: "draft",
     },
   });
   return { id: data.id };
+}
+
+/** Posts a draft invoice to the ledger (Dr A/R, Cr Revenue) — the moment it starts affecting reports. */
+export async function postInvoice(id: string, actorId: string): Promise<{ id: string }> {
+  const before = await fetchInvoiceById(id);
+  if (!before) throw new Error("Invoice not found");
+  if (before.status !== "draft") throw new Error("Only a draft invoice can be posted");
+
+  await postInvoiceEntry({
+    invoiceId: id,
+    invoiceNumber: before.invoice_number,
+    partnerId: before.partner_id,
+    projectId: before.project_id,
+    amount: before.amount,
+    issuedDate: before.issued_date,
+    actorId,
+  });
+
+  const postedAt = getToday().toISOString();
+  const { error } = await supabase
+    .from("invoices")
+    .update({ status: "posted", posted_at: postedAt, posted_by: actorId })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "post",
+    entity: "invoice",
+    entityId: id,
+    before: { status: "draft" },
+    after: { status: "posted" },
+  });
+  return { id };
+}
+
+/** Cancels a draft in place — no ledger entry was ever created, so there's nothing to reverse. Mirrors cancelDraftExpense: cancel is for drafts, void is for posted documents. */
+export async function cancelDraftInvoice(id: string, actorId: string): Promise<void> {
+  const before = await fetchInvoiceById(id);
+  if (!before) throw new Error("Invoice not found");
+  if (before.status !== "draft") throw new Error("Only a draft invoice can be cancelled");
+
+  const { error } = await supabase.from("invoices").update({ status: "cancelled" }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "cancel",
+    entity: "invoice",
+    entityId: id,
+    before: { status: "draft" },
+    after: { status: "cancelled" },
+  });
 }
 
 export interface CreateExpenseInput {
@@ -204,14 +250,25 @@ export interface CreateExpenseInput {
   description: string;
   amount: number;
   spentOn: string;
-  /** Vendor for a vendor bill — required iff dueDate is set, ignored (must be null) for a cash expense. */
+  /** Vendor — required iff dueDate is set (a vendor bill), ignored (must be null) for a cash expense. */
   partnerId?: string | null;
-  /** null => cash expense (Dr Expense / Cr Bank, posted now). Set => vendor bill (Dr Expense / Cr A/P), settled later via recordExpensePayment. */
+  /** null => cash expense, paid from paidFromAccountId at post time. Set => vendor bill, settled later via recordExpensePayment. */
   dueDate?: string | null;
+  /** Which bank/cash account this will be paid from — required for a cash expense (ignored for a vendor bill, which credits A/P instead). Only needed at post time, but accepted at create time so the draft can show it. */
+  paidFromAccountId?: string | null;
 }
 
+/**
+ * Inserts a **draft** expense document — no ledger posting, no document
+ * number. Nothing shows up in any report or budget total until postExpense
+ * flips it to posted; see help-me-plan-for-foamy-bird.md Phase D. This is
+ * the split-off half of what used to be create-and-post-in-one-shot.
+ */
 export async function createExpense(input: CreateExpenseInput, actorId: string): Promise<{ id: string }> {
   const isVendorBill = !!input.dueDate;
+  if (isVendorBill && !input.partnerId) {
+    throw new Error("partnerId is required for a vendor bill (dueDate set)");
+  }
   const { data, error } = await supabase
     .from("expenses")
     .insert({
@@ -222,35 +279,12 @@ export async function createExpense(input: CreateExpenseInput, actorId: string):
       spent_on: input.spentOn,
       partner_id: isVendorBill ? (input.partnerId ?? null) : null,
       due_date: input.dueDate ?? null,
+      paid_from_account_id: isVendorBill ? null : (input.paidFromAccountId ?? null),
+      status: "draft",
     })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
-
-  if (isVendorBill) {
-    if (!input.partnerId) throw new Error("partnerId is required for a vendor bill (dueDate set)");
-    await postVendorBillEntry({
-      expenseId: data.id,
-      category: input.category,
-      projectId: input.projectId,
-      partnerId: input.partnerId,
-      description: input.description,
-      amount: input.amount,
-      spentOn: input.spentOn,
-      actorId,
-    });
-  } else {
-    await postExpenseEntry({
-      expenseId: data.id,
-      category: input.category,
-      projectId: input.projectId,
-      partnerId: null,
-      description: input.description,
-      amount: input.amount,
-      spentOn: input.spentOn,
-      actorId,
-    });
-  }
 
   await logAudit({
     userId: actorId,
@@ -266,15 +300,150 @@ export async function createExpense(input: CreateExpenseInput, actorId: string):
       spentOn: input.spentOn,
       partnerId: isVendorBill ? (input.partnerId ?? null) : null,
       dueDate: input.dueDate ?? null,
+      status: "draft",
     },
   });
   return { id: data.id };
 }
 
-/** Caller must already have verified this expense has no payment allocations — the same guard voidInvoice applies to amount_paid. */
+export interface UpdateExpenseInput {
+  category?: ExpenseCategory;
+  projectId?: string | null;
+  description?: string;
+  amount?: number;
+  spentOn?: string;
+  partnerId?: string | null;
+  dueDate?: string | null;
+  paidFromAccountId?: string | null;
+}
+
+/** Edits a draft expense in place — the same "only a draft can change" rule updateDraftEntry already enforces for manual journal entries. */
+export async function updateExpense(id: string, patch: UpdateExpenseInput, actorId: string): Promise<void> {
+  const before = await fetchExpenseById(id);
+  if (!before) throw new Error("Expense not found");
+  if (before.status !== "draft") throw new Error("Only a draft expense can be edited");
+
+  const isVendorBill = patch.dueDate !== undefined ? !!patch.dueDate : !!before.due_date;
+  const headerPatch: Database["public"]["Tables"]["expenses"]["Update"] = {};
+  if (patch.category !== undefined) headerPatch.category = patch.category;
+  if (patch.projectId !== undefined) headerPatch.project_id = patch.projectId;
+  if (patch.description !== undefined) headerPatch.description = patch.description;
+  if (patch.amount !== undefined) headerPatch.amount = patch.amount;
+  if (patch.spentOn !== undefined) headerPatch.spent_on = patch.spentOn;
+  if (patch.dueDate !== undefined) headerPatch.due_date = patch.dueDate;
+  if (patch.partnerId !== undefined || patch.dueDate !== undefined) {
+    headerPatch.partner_id = isVendorBill ? (patch.partnerId ?? before.partner_id) : null;
+  }
+  if (patch.paidFromAccountId !== undefined) {
+    headerPatch.paid_from_account_id = isVendorBill ? null : patch.paidFromAccountId;
+  }
+
+  const { error } = await supabase.from("expenses").update(headerPatch).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "update",
+    entity: "expense",
+    entityId: id,
+    before: { ...before },
+    after: { ...before, ...patch },
+  });
+}
+
+/** Posts a draft expense: assigns its document number and generates the ledger entry — the moment it starts affecting reports and budget totals. */
+export async function postExpense(id: string, actorId: string): Promise<{ id: string; documentNumber: string }> {
+  const before = await fetchExpenseById(id);
+  if (!before) throw new Error("Expense not found");
+  if (before.status !== "draft") throw new Error("Only a draft expense can be posted");
+
+  const isVendorBill = !!before.due_date;
+  if (isVendorBill && !before.partner_id) {
+    throw new Error("This vendor bill has no vendor on record");
+  }
+  if (!isVendorBill && !before.paid_from_account_id) {
+    throw new Error("Choose which account this was paid from before posting");
+  }
+
+  const spentOnYear = new Date(before.spent_on).getUTCFullYear();
+  const { data: numberResult, error: numberError } = await supabase.rpc("next_expense_number", {
+    p_year: spentOnYear,
+  });
+  if (numberError) throw new Error(numberError.message);
+  const documentNumber = numberResult as unknown as string;
+
+  if (isVendorBill) {
+    await postVendorBillEntry({
+      expenseId: id,
+      category: before.category,
+      projectId: before.project_id,
+      partnerId: before.partner_id!,
+      description: before.description,
+      amount: before.amount,
+      spentOn: before.spent_on,
+      actorId,
+    });
+  } else {
+    await postExpenseEntry({
+      expenseId: id,
+      category: before.category,
+      projectId: before.project_id,
+      partnerId: null,
+      description: before.description,
+      amount: before.amount,
+      spentOn: before.spent_on,
+      actorId,
+      paidFromAccountId: before.paid_from_account_id,
+    });
+  }
+
+  const { error } = await supabase
+    .from("expenses")
+    .update({
+      status: "posted",
+      document_number: documentNumber,
+      posted_at: getToday().toISOString().slice(0, 10),
+      posted_by: actorId,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "post",
+    entity: "expense",
+    entityId: id,
+    before: { status: "draft" },
+    after: { status: "posted", documentNumber },
+  });
+
+  return { id, documentNumber };
+}
+
+/** Cancels a draft in place — no ledger entry was ever created, so there's nothing to reverse. Mirrors cancelDraftEntry's role for manual journal entries: cancel is for drafts, void is for posted documents. */
+export async function cancelDraftExpense(id: string, actorId: string): Promise<void> {
+  const before = await fetchExpenseById(id);
+  if (!before) throw new Error("Expense not found");
+  if (before.status !== "draft") throw new Error("Only a draft expense can be cancelled");
+
+  const { error } = await supabase.from("expenses").update({ status: "cancelled" }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit({
+    userId: actorId,
+    action: "cancel",
+    entity: "expense",
+    entityId: id,
+    before: { status: "draft" },
+    after: { status: "cancelled" },
+  });
+}
+
+/** Caller must already have verified this expense has no payment allocations — the same guard voidInvoice applies to amount_paid. Corrects a *posted* expense; a draft is cancelled instead (cancelDraftExpense). */
 export async function voidExpense(id: string, actorId: string): Promise<void> {
   const before = await fetchExpenseById(id);
   if (!before) throw new Error("Expense not found");
+  if (before.status !== "posted") throw new Error("Only a posted expense can be voided");
   if (before.voided_at) throw new Error("This expense is already voided");
   const outstanding = await fetchExpenseOutstanding(id);
   if (before.due_date && outstanding < before.amount) {
@@ -376,21 +545,37 @@ export async function recordExpensePayment(
 }
 
 export interface UpdateInvoiceInput {
+  invoiceNumber?: string;
+  projectId?: string;
   amount: number;
   issuedDate: string;
   dueDate: string;
 }
 
+/** Edits a draft invoice in place — mirrors updateExpense's "only a draft can change" rule. */
 export async function updateInvoice(
   id: string,
   input: UpdateInvoiceInput,
   actorId: string,
 ): Promise<void> {
   const before = await fetchInvoiceById(id);
-  const { error } = await supabase
-    .from("invoices")
-    .update({ amount: input.amount, issued_date: input.issuedDate, due_date: input.dueDate })
-    .eq("id", id);
+  if (!before) throw new Error("Invoice not found");
+  if (before.status !== "draft") throw new Error("Only a draft invoice can be edited");
+
+  const patch: Database["public"]["Tables"]["invoices"]["Update"] = {
+    amount: input.amount,
+    issued_date: input.issuedDate,
+    due_date: input.dueDate,
+  };
+  if (input.invoiceNumber !== undefined) patch.invoice_number = input.invoiceNumber;
+  if (input.projectId !== undefined && input.projectId !== before.project_id) {
+    const project = await fetchProjectById(input.projectId);
+    if (!project) throw new Error("Project not found");
+    patch.project_id = input.projectId;
+    patch.partner_id = project.partner_id;
+  }
+
+  const { error } = await supabase.from("invoices").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 
   await logAudit({
@@ -398,16 +583,31 @@ export async function updateInvoice(
     action: "update",
     entity: "invoice",
     entityId: id,
-    before: before
-      ? { amount: before.amount, issuedDate: before.issued_date, dueDate: before.due_date }
-      : null,
-    after: { amount: input.amount, issuedDate: input.issuedDate, dueDate: input.dueDate },
+    before: {
+      invoiceNumber: before.invoice_number,
+      projectId: before.project_id,
+      amount: before.amount,
+      issuedDate: before.issued_date,
+      dueDate: before.due_date,
+    },
+    after: {
+      invoiceNumber: input.invoiceNumber ?? before.invoice_number,
+      projectId: input.projectId ?? before.project_id,
+      amount: input.amount,
+      issuedDate: input.issuedDate,
+      dueDate: input.dueDate,
+    },
   });
 }
 
-/** Caller must already have verified amount_paid === 0 — the DB constraint would reject it otherwise. */
+/** Reverses a *posted* invoice via a reversal journal entry; a draft is cancelled instead (cancelDraftInvoice). Self-contained guards, mirroring voidExpense. */
 export async function voidInvoice(id: string, actorId: string): Promise<void> {
   const before = await fetchInvoiceById(id);
+  if (!before) throw new Error("Invoice not found");
+  if (before.status !== "posted") throw new Error("Only a posted invoice can be voided");
+  if (before.voided_at) throw new Error("This invoice is already cancelled");
+  if (before.amount_paid > 0) throw new Error("Cannot cancel an invoice that has payments recorded");
+
   const voidedAt = getToday().toISOString().slice(0, 10);
   const { error } = await supabase.from("invoices").update({ voided_at: voidedAt }).eq("id", id);
   if (error) throw error;
@@ -452,6 +652,7 @@ export async function recordInvoicePayment(
 ): Promise<void> {
   const before = await fetchInvoiceById(id);
   if (!before) throw new Error("Invoice not found");
+  if (before.status !== "posted") throw new Error("This invoice hasn't been posted yet");
   if (before.voided_at) throw new Error("This invoice was cancelled — it can't receive payments");
   if (before.amount_paid >= before.amount) throw new Error("This invoice is already fully paid");
 

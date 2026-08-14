@@ -43,7 +43,8 @@ dashboardRouter.get("/", async (_req, res) => {
       fetchCashSnapshots(2),
     ]);
 
-  const live = invoiceRows.filter((i) => !i.voided_at);
+  // A draft invoice has no ledger entry yet — exclude it, same as a voided one.
+  const live = invoiceRows.filter((i) => !i.voided_at && i.status === "posted");
 
   /* ── Headline: revenue this month vs target (accrual rule) ── */
   const revenueThisMonth = live
@@ -152,6 +153,7 @@ dashboardRouter.get("/", async (_req, res) => {
         dueDate: inv.due_date,
         paidDate: inv.paid_date,
         voidedAt: inv.voided_at,
+        documentStatus: inv.status,
       },
       today,
     );
@@ -217,6 +219,7 @@ dashboardRouter.get("/", async (_req, res) => {
         dueDate: inv.due_date,
         paidDate: inv.paid_date,
         voidedAt: inv.voided_at,
+        documentStatus: inv.status,
       };
       return { inv, status: invoiceStatus(facts, today), outstanding: outstanding(facts) };
     })

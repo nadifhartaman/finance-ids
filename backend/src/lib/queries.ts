@@ -36,6 +36,8 @@ export async function fetchProfileById(id: string): Promise<ProfileRow | null> {
   return data;
 }
 
+type InvoiceStatus = Database["public"]["Enums"]["invoice_status"];
+
 export interface InvoiceRow {
   id: string;
   invoice_number: string;
@@ -45,6 +47,7 @@ export interface InvoiceRow {
   due_date: string;
   paid_date: string | null;
   voided_at: string | null;
+  status: InvoiceStatus;
   project: {
     id: string;
     name: string;
@@ -57,7 +60,7 @@ export async function fetchInvoices(): Promise<InvoiceRow[]> {
   const { data, error } = await supabase
     .from("invoices")
     .select(
-      `id, invoice_number, amount, amount_paid, issued_date, due_date, paid_date, voided_at,
+      `id, invoice_number, amount, amount_paid, issued_date, due_date, paid_date, voided_at, status,
        project:projects!inner ( id, name, product_line, client:partners!inner ( name, client_type ) )`,
     )
     .order("issued_date");
@@ -68,23 +71,88 @@ export async function fetchInvoices(): Promise<InvoiceRow[]> {
 export interface InvoiceFactsRow {
   invoice_number: string;
   partner_id: string;
+  project_id: string;
   amount: number;
   amount_paid: number;
   issued_date: string;
   due_date: string;
   paid_date: string | null;
   voided_at: string | null;
+  status: InvoiceStatus;
 }
 
 /** Lightweight single-invoice read for capturing "before" state ahead of a write — see mutations.ts. */
 export async function fetchInvoiceById(id: string): Promise<InvoiceFactsRow | null> {
   const { data, error } = await supabase
     .from("invoices")
-    .select("invoice_number, partner_id, amount, amount_paid, issued_date, due_date, paid_date, voided_at")
+    .select(
+      "invoice_number, partner_id, project_id, amount, amount_paid, issued_date, due_date, paid_date, voided_at, status",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+export interface InvoiceDocumentRow {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  amountPaid: number;
+  issuedDate: string;
+  dueDate: string;
+  paidDate: string | null;
+  voidedAt: string | null;
+  status: InvoiceStatus;
+  postedAt: string | null;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+}
+
+/** Joined single-invoice read for the document detail/edit page (my-app's /money-in/invoices/[id]). */
+export async function fetchInvoiceDocumentById(id: string): Promise<InvoiceDocumentRow | null> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select(
+      `id, invoice_number, amount, amount_paid, issued_date, due_date, paid_date, voided_at, status, posted_at, project_id,
+       project:projects!inner ( name, client:partners!inner ( name ) )`,
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const r = data as unknown as {
+    id: string;
+    invoice_number: string;
+    amount: number;
+    amount_paid: number;
+    issued_date: string;
+    due_date: string;
+    paid_date: string | null;
+    voided_at: string | null;
+    status: InvoiceStatus;
+    posted_at: string | null;
+    project_id: string;
+    project: { name: string; client: { name: string } };
+  };
+
+  return {
+    id: r.id,
+    invoiceNumber: r.invoice_number,
+    amount: r.amount,
+    amountPaid: r.amount_paid,
+    issuedDate: r.issued_date,
+    dueDate: r.due_date,
+    paidDate: r.paid_date,
+    voidedAt: r.voided_at,
+    status: r.status,
+    postedAt: r.posted_at,
+    projectId: r.project_id,
+    projectName: r.project.name,
+    clientName: r.project.client.name,
+  };
 }
 
 export interface ClientRow {
@@ -182,17 +250,163 @@ export interface ExpenseFactsRow {
   spent_on: string;
   due_date: string | null;
   voided_at: string | null;
+  status: Database["public"]["Enums"]["expense_status"];
+  document_number: string | null;
+  paid_from_account_id: string | null;
 }
 
 /** Lightweight single-expense read for capturing "before" state ahead of a write — see mutations.ts. */
 export async function fetchExpenseById(id: string): Promise<ExpenseFactsRow | null> {
   const { data, error } = await supabase
     .from("expenses")
-    .select("category, project_id, partner_id, description, amount, spent_on, due_date, voided_at")
+    .select(
+      "category, project_id, partner_id, description, amount, spent_on, due_date, voided_at, status, document_number, paid_from_account_id",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+export interface ExpenseDocumentRow {
+  id: string;
+  documentNumber: string | null;
+  category: ExpenseCategory;
+  status: Database["public"]["Enums"]["expense_status"];
+  description: string;
+  amount: number;
+  spentOn: string;
+  dueDate: string | null;
+  voidedAt: string | null;
+  partnerId: string | null;
+  partnerName: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  paidFromAccountId: string | null;
+  paidFromAccountName: string | null;
+}
+
+/** The expense document list — the transaction-level view that never existed before. Paginated the same way fetchJournalEntries is (an unbounded list over a growing table). */
+export async function fetchExpenseDocuments(params: {
+  from?: string;
+  to?: string;
+  category?: ExpenseCategory;
+  status?: Database["public"]["Enums"]["expense_status"];
+  page?: number;
+  limit?: number;
+}): Promise<{ data: ExpenseDocumentRow[]; page: number; limit: number; total: number }> {
+  const page = params.page && params.page > 0 ? params.page : 1;
+  const limit = params.limit && params.limit > 0 ? Math.min(params.limit, 100) : 20;
+  const rangeStart = (page - 1) * limit;
+  const rangeEnd = rangeStart + limit - 1;
+
+  let query = supabase
+    .from("expenses")
+    .select(
+      "id, document_number, category, status, description, amount, spent_on, due_date, voided_at, partner_id, project_id, paid_from_account_id, partner:partners ( name ), project:projects ( name ), paid_from:accounts!expenses_paid_from_account_id_fkey ( name )",
+      { count: "exact" },
+    )
+    .order("spent_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(rangeStart, rangeEnd);
+
+  if (params.from) query = query.gte("spent_on", params.from);
+  if (params.to) query = query.lte("spent_on", params.to);
+  if (params.category) query = query.eq("category", params.category);
+  if (params.status) query = query.eq("status", params.status);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const rows = data as unknown as {
+    id: string;
+    document_number: string | null;
+    category: ExpenseCategory;
+    status: Database["public"]["Enums"]["expense_status"];
+    description: string;
+    amount: number;
+    spent_on: string;
+    due_date: string | null;
+    voided_at: string | null;
+    partner_id: string | null;
+    project_id: string | null;
+    paid_from_account_id: string | null;
+    partner: { name: string } | null;
+    project: { name: string } | null;
+    paid_from: { name: string } | null;
+  }[];
+
+  return {
+    data: rows.map((r) => ({
+      id: r.id,
+      documentNumber: r.document_number,
+      category: r.category,
+      status: r.status,
+      description: r.description,
+      amount: r.amount,
+      spentOn: r.spent_on,
+      dueDate: r.due_date,
+      voidedAt: r.voided_at,
+      partnerId: r.partner_id,
+      partnerName: r.partner?.name ?? null,
+      projectId: r.project_id,
+      projectName: r.project?.name ?? null,
+      paidFromAccountId: r.paid_from_account_id,
+      paidFromAccountName: r.paid_from?.name ?? null,
+    })),
+    page,
+    limit,
+    total: count ?? 0,
+  };
+}
+
+/** Same shape as one row of fetchExpenseDocuments, for the document detail/edit page. */
+export async function fetchExpenseDocumentById(id: string): Promise<ExpenseDocumentRow | null> {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select(
+      "id, document_number, category, status, description, amount, spent_on, due_date, voided_at, partner_id, project_id, paid_from_account_id, partner:partners ( name ), project:projects ( name ), paid_from:accounts!expenses_paid_from_account_id_fkey ( name )",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const r = data as unknown as {
+    id: string;
+    document_number: string | null;
+    category: ExpenseCategory;
+    status: Database["public"]["Enums"]["expense_status"];
+    description: string;
+    amount: number;
+    spent_on: string;
+    due_date: string | null;
+    voided_at: string | null;
+    partner_id: string | null;
+    project_id: string | null;
+    paid_from_account_id: string | null;
+    partner: { name: string } | null;
+    project: { name: string } | null;
+    paid_from: { name: string } | null;
+  };
+
+  return {
+    id: r.id,
+    documentNumber: r.document_number,
+    category: r.category,
+    status: r.status,
+    description: r.description,
+    amount: r.amount,
+    spentOn: r.spent_on,
+    dueDate: r.due_date,
+    voidedAt: r.voided_at,
+    partnerId: r.partner_id,
+    partnerName: r.partner?.name ?? null,
+    projectId: r.project_id,
+    projectName: r.project?.name ?? null,
+    paidFromAccountId: r.paid_from_account_id,
+    paidFromAccountName: r.paid_from?.name ?? null,
+  };
 }
 
 /** Outstanding balance on a vendor bill: amount minus everything allocated to it via payment_allocations. */

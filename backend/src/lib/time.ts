@@ -28,6 +28,12 @@ export function previousMonthStart(date: Date): string {
   return monthStart(d);
 }
 
+/** Last day of the month containing `date`, as YYYY-MM-DD (UTC). */
+export function monthEnd(date: Date): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
 /** True if the ISO date string falls in the same UTC month as `date`. */
 export function isSameMonth(iso: string, date: Date): boolean {
   return iso.slice(0, 7) === monthStart(date).slice(0, 7);

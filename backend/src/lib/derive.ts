@@ -14,9 +14,12 @@ export interface InvoiceFacts {
   dueDate: string; // ISO
   paidDate: string | null;
   voidedAt: string | null;
+  documentStatus: "draft" | "posted" | "cancelled";
 }
 
 export type InvoiceStatusKind =
+  | "draft"
+  | "cancelled"
   | "void"
   | "paid"
   | "overdue"
@@ -30,14 +33,21 @@ export interface InvoiceStatus {
 }
 
 /**
- * Precedence: void > paid > overdue > partially-paid > awaiting.
+ * Precedence: draft/cancelled (document lifecycle, never posted) > void
+ * (posted then reversed) > paid > overdue > partially-paid > awaiting.
  * Overdue beats partial because status is an attention signal — a late
  * invoice that's 80% paid still needs chasing. The UI can still show
  * progress from amount/amountPaid, which travel alongside.
  */
 export function invoiceStatus(invoice: InvoiceFacts, today: Date): InvoiceStatus {
+  if (invoice.documentStatus === "draft") {
+    return { kind: "draft", label: "Draft", daysOverdue: 0 };
+  }
+  if (invoice.documentStatus === "cancelled") {
+    return { kind: "cancelled", label: "Cancelled", daysOverdue: 0 };
+  }
   if (invoice.voidedAt) {
-    return { kind: "void", label: "Cancelled", daysOverdue: 0 };
+    return { kind: "void", label: "Voided", daysOverdue: 0 };
   }
   if (invoice.paidDate) {
     return { kind: "paid", label: "Paid", daysOverdue: 0 };

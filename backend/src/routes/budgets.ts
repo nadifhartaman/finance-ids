@@ -1,28 +1,18 @@
 import { Router } from "express";
-import { spentByProject } from "../lib/aggregate.js";
 import { budgetHealth, type BudgetHealth } from "../lib/derive.js";
 import { requirePermission } from "../middleware/auth.js";
-import {
-  createExpense,
-  isExpenseCategory,
-  updateCategoryBudget,
-  voidExpense,
-  type ExpenseCategory,
-} from "../lib/mutations.js";
+import { isExpenseCategory, updateCategoryBudget, type ExpenseCategory } from "../lib/mutations.js";
 import {
   fetchCategoryBudgetPeriods,
   fetchCategoryBudgets,
   fetchExpenses,
   fetchProjects,
 } from "../lib/queries.js";
-import { getToday, monthStart } from "../lib/time.js";
+import { fetchExpenseByLane, fetchProjectCostByRange } from "../lib/accounting/reports.js";
+import { getToday, monthEnd, monthStart } from "../lib/time.js";
 import { formatRupiah, periodLabel } from "../lib/format.js";
 
 export const budgetsRouter = Router();
-
-function isIsoDate(value: unknown): value is string {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
 
 const CATEGORY_LABELS = {
   payroll: "Payroll",
@@ -77,12 +67,26 @@ budgetsRouter.get("/", async (req, res) => {
     return;
   }
 
-  const [budgetRows, expenseRows, projectRows, budgetPeriods] = await Promise.all([
-    fetchCategoryBudgets(period ?? currentPeriod),
-    fetchExpenses(),
-    fetchProjects(),
-    fetchCategoryBudgetPeriods(),
-  ]);
+  // Ledger for totals, documents for lists: every "spent" figure below comes
+  // from the ledger (fetchExpenseByLane / fetchProjectCostByRange), which
+  // sees both quick-form expenses and manual journal entries, and correctly
+  // nets out voided expenses' reversals. `expenseRows` (the `expenses` table)
+  // is now only used to populate the month picker, which just needs "did
+  // *something* happen in this month", not a trustworthy total.
+  const monthBounds =
+    scopeKind === "month"
+      ? { from: period as string, to: monthEnd(new Date(`${period}T00:00:00Z`)) }
+      : { from: undefined, to: undefined };
+
+  const [budgetRows, expenseRows, projectRows, budgetPeriods, expenseByLane, projectCostSpent] =
+    await Promise.all([
+      fetchCategoryBudgets(period ?? currentPeriod),
+      fetchExpenses(),
+      fetchProjects(),
+      fetchCategoryBudgetPeriods(),
+      fetchExpenseByLane(monthBounds.from, monthBounds.to),
+      fetchProjectCostByRange(monthBounds.from, monthBounds.to),
+    ]);
 
   // Months the select can switch to: any month with spending or a plan,
   // excluding the current month (it gets its own "This month" option).
@@ -102,7 +106,6 @@ budgetsRouter.get("/", async (req, res) => {
     isCurrent,
   };
 
-  const allTimeProjectSpent = spentByProject(expenseRows);
   const budgetInsights: string[] = [];
   let categoryBudgets: BudgetItem[];
   let projectBudgets: BudgetItem[];
@@ -110,17 +113,11 @@ budgetsRouter.get("/", async (req, res) => {
   let projectNote: string;
 
   if (scopeKind === "month") {
-    const monthExpenses = expenseRows.filter(
-      (e) => e.spent_on.slice(0, 7) === (period as string).slice(0, 7),
-    );
-
     // All 3 categories, whether or not a plan row exists for this month —
     // spend is still worth showing, the card just says "no plan set".
     categoryBudgets = (Object.keys(CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => {
       const plan = budgetRows.find((b) => b.category === cat) ?? null;
-      const spent = monthExpenses
-        .filter((e) => e.category === cat)
-        .reduce((s, e) => s + e.amount, 0);
+      const spent = expenseByLane[cat];
       return {
         id: `cat-${cat}`,
         name: CATEGORY_LABELS[cat],
@@ -134,14 +131,13 @@ budgetsRouter.get("/", async (req, res) => {
     // zero-spend projects made the list look incomplete (only 5 of 12
     // showed up with the seed data). No health: project budgets cap the
     // whole project, so a single month has nothing to compare against.
-    const monthProjectSpent = spentByProject(monthExpenses);
     projectBudgets = projectRows
       .map((p) => ({
         id: p.id,
         name: p.name,
         subtitle: p.client.name,
         budget: null,
-        spent: monthProjectSpent.get(p.id) ?? 0,
+        spent: projectCostSpent.get(p.id) ?? 0,
         health: null,
       }))
       .sort((a, b) => b.spent - a.spent);
@@ -185,9 +181,7 @@ budgetsRouter.get("/", async (req, res) => {
       id: `cat-${cat}`,
       name: CATEGORY_LABELS[cat],
       budget: null,
-      spent: expenseRows
-        .filter((e) => e.category === cat)
-        .reduce((s, e) => s + e.amount, 0),
+      spent: expenseByLane[cat],
       health: null,
     }));
 
@@ -201,7 +195,7 @@ budgetsRouter.get("/", async (req, res) => {
     const budgetedProjects = projectRows
       .filter((p) => p.budget !== null)
       .map((p) => {
-        const spent = allTimeProjectSpent.get(p.id) ?? 0;
+        const spent = projectCostSpent.get(p.id) ?? 0;
         return {
           id: p.id,
           name: p.name,
@@ -218,7 +212,7 @@ budgetsRouter.get("/", async (req, res) => {
         name: p.name,
         subtitle: p.client.name,
         budget: null,
-        spent: allTimeProjectSpent.get(p.id) ?? 0,
+        spent: projectCostSpent.get(p.id) ?? 0,
         health: null,
       }));
 
@@ -267,84 +261,5 @@ budgetsRouter.patch("/categories/:category", requirePermission("budgets.edit"), 
   }
   await updateCategoryBudget(category, plannedAmount, req.user!.id);
   res.json({ ok: true });
-});
-
-budgetsRouter.post("/expenses", requirePermission("spending.write"), async (req, res) => {
-  const { category, projectId, description, amount, spentOn, partnerId, dueDate } = req.body ?? {};
-
-  if (
-    typeof category !== "string" ||
-    !isExpenseCategory(category) ||
-    typeof description !== "string" ||
-    !description.trim() ||
-    typeof amount !== "number" ||
-    !Number.isFinite(amount) ||
-    amount <= 0 ||
-    !isIsoDate(spentOn)
-  ) {
-    res.status(400).json({
-      error: "category, description, and a positive amount are required, and spentOn must be a valid date",
-    });
-    return;
-  }
-
-  const isProjectCost = category === "project_costs";
-  if (isProjectCost && (typeof projectId !== "string" || !projectId.trim())) {
-    res.status(400).json({ error: "projectId is required for project costs" });
-    return;
-  }
-  if (!isProjectCost && projectId != null && projectId !== "") {
-    res.status(400).json({ error: "projectId is only allowed for project costs" });
-    return;
-  }
-
-  // dueDate present => vendor bill (Dr Expense / Cr Accounts Payable); absent => cash expense (Dr Expense / Cr Bank).
-  let normalizedDueDate: string | null = null;
-  if (dueDate != null && dueDate !== "") {
-    if (!isIsoDate(dueDate) || dueDate < spentOn) {
-      res.status(400).json({ error: "dueDate must be a valid date on or after spentOn" });
-      return;
-    }
-    if (typeof partnerId !== "string" || !partnerId.trim()) {
-      res.status(400).json({ error: "partnerId (the vendor) is required when dueDate is set" });
-      return;
-    }
-    normalizedDueDate = dueDate;
-  } else if (partnerId != null && partnerId !== "") {
-    res.status(400).json({ error: "partnerId is only allowed alongside dueDate (a vendor bill)" });
-    return;
-  }
-
-  try {
-    const { id } = await createExpense(
-      {
-        category,
-        projectId: isProjectCost ? projectId : null,
-        description: description.trim(),
-        amount,
-        spentOn,
-        partnerId: normalizedDueDate ? partnerId : null,
-        dueDate: normalizedDueDate,
-      },
-      req.user!.id,
-    );
-    res.status(201).json({ id });
-  } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : "Failed to create expense" });
-  }
-});
-
-budgetsRouter.patch("/expenses/:id/void", requirePermission("spending.write"), async (req, res) => {
-  const expenseId = req.params.id;
-  if (typeof expenseId !== "string") {
-    res.status(400).json({ error: "Invalid expense id" });
-    return;
-  }
-  try {
-    await voidExpense(expenseId, req.user!.id);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : "Failed to void expense" });
-  }
 });
 

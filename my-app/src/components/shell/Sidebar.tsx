@@ -3,19 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ArrowDownIcon,
   BriefcaseIcon,
   GridIcon,
-  PieIcon,
-  ReceiptIcon,
-  TrendIcon,
+  LandmarkIcon,
+  TrendingUpIcon,
 } from "./icons";
 
 const NAV = [
   { href: "/", label: "Dashboard", Icon: GridIcon },
-  { href: "/invoices", label: "Invoices", Icon: ReceiptIcon },
-  { href: "/trends", label: "Trends", Icon: TrendIcon },
-  { href: "/budgets", label: "Budgets", Icon: PieIcon },
+  { href: "/money-in", label: "Money In", Icon: TrendingUpIcon },
+  { href: "/money-out", label: "Money Out", Icon: ArrowDownIcon },
   { href: "/projects", label: "Projects", Icon: BriefcaseIcon },
+  { href: "/debt", label: "Debt", Icon: LandmarkIcon },
 ];
 
 export default function Sidebar() {

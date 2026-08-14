@@ -1,8 +1,8 @@
 /**
  * Shown instantly on navigation while the target page's Server Component
  * awaits its data — without this, clicking a sidebar link left the old page
- * frozen on screen for the full round trip. Same recessive skeleton tone as
- * ChartPlaceholder, so it never looks like real content.
+ * frozen on screen for the full round trip. Recessive skeleton tone, so it
+ * never looks like real content.
  */
 export default function AppLoading() {
   return (
