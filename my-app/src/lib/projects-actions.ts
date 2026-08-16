@@ -73,8 +73,8 @@ export async function createProject(
 
   revalidatePath("/projects");
   revalidatePath("/");
-  revalidatePath("/invoices");
-  revalidatePath("/budgets");
+  revalidatePath("/money-in");
+  revalidatePath("/money-out");
   return { error: null, success: true };
 }
 
@@ -85,7 +85,7 @@ export async function updateProject(
   return patchAction(
     `/api/projects/${id}`,
     input,
-    ["/projects", "/", "/invoices", "/budgets"],
+    ["/projects", "/", "/money-in", "/money-out"],
     "Failed to update project.",
   );
 }
@@ -94,7 +94,7 @@ export async function deleteProject(id: string): Promise<{ error: string | null 
   return patchAction(
     `/api/projects/${id}`,
     undefined,
-    ["/projects", "/", "/invoices", "/budgets"],
+    ["/projects", "/", "/money-in", "/money-out"],
     "Failed to delete project.",
     "DELETE",
   );

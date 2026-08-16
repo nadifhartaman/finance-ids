@@ -10,7 +10,7 @@ export async function updateRevenueTarget(
   return patchAction(
     `/api/trends/targets/${period}`,
     { targetAmount },
-    ["/trends", "/"],
+    ["/money-in", "/"],
     "Failed to update target.",
   );
 }

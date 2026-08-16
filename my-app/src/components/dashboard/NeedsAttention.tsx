@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { Chip, type ChipColor } from "@/components/ui/chip";
+import { Pagination } from "@/components/ui/pagination";
 import type { AttentionItem } from "@/lib/types";
 
 const SEVERITY: Record<AttentionItem["severity"], { color: ChipColor; label: string }> = {
@@ -6,7 +10,18 @@ const SEVERITY: Record<AttentionItem["severity"], { color: ChipColor; label: str
   warning: { color: "warning", label: "Watch" },
 };
 
+const ROWS_PER_PAGE = 5;
+
 export default function NeedsAttention({ items }: { items: AttentionItem[] }) {
+  const [page, setPage] = useState(1);
+
+  const pageCount = Math.max(1, Math.ceil(items.length / ROWS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = items.slice(
+    (currentPage - 1) * ROWS_PER_PAGE,
+    currentPage * ROWS_PER_PAGE,
+  );
+
   return (
     <section
       aria-labelledby="needs-attention"
@@ -19,7 +34,7 @@ export default function NeedsAttention({ items }: { items: AttentionItem[] }) {
         Things that may need a decision from you.
       </p>
       <ul className="mt-4 divide-y divide-card-border">
-        {items.map((item) => {
+        {pageItems.map((item) => {
           const severity = SEVERITY[item.severity];
           return (
             <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
@@ -34,6 +49,14 @@ export default function NeedsAttention({ items }: { items: AttentionItem[] }) {
           );
         })}
       </ul>
+      <Pagination
+        page={currentPage}
+        pageCount={pageCount}
+        total={items.length}
+        pageSize={ROWS_PER_PAGE}
+        itemLabel="items"
+        onPageChange={setPage}
+      />
     </section>
   );
 }

@@ -30,7 +30,7 @@ export default function BudgetScopeSelect({
         onChange={(e) => {
           const next = e.target.value;
           startTransition(() => {
-            router.push(next === "" ? "/budgets" : `/budgets?scope=${next}`);
+            router.push(next === "" ? "/money-out" : `/money-out?scope=${next}`);
           });
         }}
         className="rounded-lg border border-card-border bg-card px-3 py-2 text-sm font-medium text-title disabled:opacity-60"

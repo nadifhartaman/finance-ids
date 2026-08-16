@@ -16,8 +16,9 @@ trendsRouter.get("/", async (_req, res) => {
     fetchRevenueTargets(),
   ]);
 
-  // Accrual rule (docs/erd.md): revenue = non-voided invoices by issue month.
-  const live = invoiceRows.filter((i) => !i.voided_at);
+  // Accrual rule (docs/erd.md): revenue = posted, non-voided invoices by
+  // issue month — a draft has no ledger entry yet, so it doesn't count.
+  const live = invoiceRows.filter((i) => !i.voided_at && i.status === "posted");
 
   const revenueByMonth = new Map<string, number>();
   for (const inv of live) {

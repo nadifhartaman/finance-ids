@@ -23,7 +23,11 @@ export type PermissionAction =
   | "budgets.edit"
   | "targets.edit"
   | "notes.write"
-  | "users.manage";
+  | "users.manage"
+  | "accounting.reports.read"
+  | "accounting.post"
+  | "accounting.manual-entry"
+  | "coa.manage";
 
 const permissions: Record<PermissionAction, readonly Role[]> = {
   "invoices.write": ["superadmin", "admin"],
@@ -34,6 +38,13 @@ const permissions: Record<PermissionAction, readonly Role[]> = {
   "targets.edit": ["superadmin", "admin", "director"],
   "notes.write": ["superadmin", "admin", "director"],
   "users.manage": ["superadmin"],
+  // Director edits plans/judgments, not records of fact (root CLAUDE.md) —
+  // posting and manual entries are excluded even though director can see
+  // every report.
+  "accounting.reports.read": ["superadmin", "admin", "director", "member"],
+  "accounting.post": ["superadmin", "admin"],
+  "accounting.manual-entry": ["superadmin", "admin"],
+  "coa.manage": ["superadmin", "admin"],
 };
 
 export function can(role: Role, action: PermissionAction): boolean {

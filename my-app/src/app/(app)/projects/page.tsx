@@ -1,5 +1,9 @@
+import { Suspense } from "react";
 import ProjectSummaryCards from "@/components/projects/ProjectSummaryCards";
 import ProjectTable from "@/components/projects/ProjectTable";
+import ProjectPerformanceSection from "@/components/accounting/ProjectPerformanceSection";
+import SectionBoundary from "@/components/accounting/SectionBoundary";
+import SectionSkeleton from "@/components/accounting/SectionSkeleton";
 import { getRequiredUser } from "@/lib/auth";
 import { getClients, getProjects } from "@/lib/api";
 import { can } from "@/lib/roles";
@@ -33,6 +37,14 @@ export default async function ProjectsPage() {
           canWrite={canWrite}
           clients={canWrite ? clients : []}
         />
+      </div>
+
+      <div className="mt-4">
+        <SectionBoundary title="Project Performance">
+          <Suspense fallback={<SectionSkeleton />}>
+            <ProjectPerformanceSection />
+          </Suspense>
+        </SectionBoundary>
       </div>
     </>
   );

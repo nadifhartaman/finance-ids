@@ -1,25 +1,42 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import BudgetOverview from "@/components/dashboard/BudgetOverview";
-import ChartPlaceholder from "@/components/dashboard/ChartPlaceholder";
 import DashboardNotes from "@/components/dashboard/DashboardNotes";
 import HeroCard from "@/components/dashboard/HeroCard";
-import NeedsAttention from "@/components/dashboard/NeedsAttention";
-import SectionCard from "@/components/ui/section-card";
 import StatCard from "@/components/dashboard/StatCard";
 import UnpaidInvoices from "@/components/dashboard/UnpaidInvoices";
+import CashBankSection from "@/components/accounting/CashBankSection";
+import NeedsAttentionSection from "@/components/accounting/NeedsAttentionSection";
+import SectionBoundary from "@/components/accounting/SectionBoundary";
+import SectionSkeleton from "@/components/accounting/SectionSkeleton";
+import SectionCard from "@/components/ui/section-card";
 import { Chip } from "@/components/ui/chip";
 import { getRequiredUser } from "@/lib/auth";
-import { getBudgets, getDashboard, getNotes } from "@/lib/api";
+import { getBudgets, getDashboard, getDebt, getNotes } from "@/lib/api";
+import { isCashFlowRange, type CashFlowRange } from "@/lib/accounting-period";
 import { formatRupiah } from "@/lib/format";
 import { can } from "@/lib/roles";
 
-export default async function Home() {
-  const [user, dashboard, { notes }, { totals: budgetTotals, categoryBudgets }] =
-    await Promise.all([getRequiredUser(), getDashboard(), getNotes(), getBudgets()]);
-  const { asOf, period, headlineStats, attentionItems, totalUnpaid, unpaidInvoices, projectStats } =
-    dashboard;
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const { range: rangeParam } = await searchParams;
+  const range: CashFlowRange = isCashFlowRange(rangeParam) ? rangeParam : "30d";
+
+  const [user, dashboard, { notes }, { totals: budgetTotals, categoryBudgets }, { loans }] =
+    await Promise.all([
+      getRequiredUser(),
+      getDashboard(),
+      getNotes(),
+      getBudgets(),
+      getDebt("active"),
+    ]);
+  const { asOf, period, headlineStats, totalUnpaid, unpaidInvoices, projectStats } = dashboard;
   const cash = headlineStats.find((s) => s.id === "cash")!;
   const kpis = headlineStats.filter((s) => s.id !== "cash");
+  const outstandingDebt = loans.reduce((sum, l) => sum + l.outstandingPrincipal, 0);
 
   return (
     <>
@@ -43,41 +60,28 @@ export default async function Home() {
       </div>
 
       <div className="mt-4">
-        <NeedsAttention items={attentionItems} />
+        <SectionBoundary title="Needs attention">
+          <Suspense fallback={<SectionSkeleton className="h-40" />}>
+            <NeedsAttentionSection />
+          </Suspense>
+        </SectionBoundary>
+      </div>
+
+      <div className="mt-4">
+        <SectionBoundary title="Cash & Bank">
+          <Suspense fallback={<SectionSkeleton />}>
+            <CashBankSection range={range} basePath="/" />
+          </Suspense>
+        </SectionBoundary>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <SectionCard
-          title="Money coming in"
-          question="Are we on track to hit this month's revenue target?"
-          action={
-            <Link
-              href="/trends"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
-              See all →
-            </Link>
-          }
-        >
-          <ChartPlaceholder kind="bars" caption="Revenue vs target, by month" />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <ChartPlaceholder
-              kind="bars"
-              caption="Government vs private clients"
-            />
-            <ChartPlaceholder
-              kind="bars"
-              caption="By product (VIANA, ORION, AIoT, Indi AI, Digital Twin)"
-            />
-          </div>
-        </SectionCard>
-
         <SectionCard
           title="Money owed to us"
           question={`Clients owe us ${formatRupiah(totalUnpaid)} in unpaid invoices — who should we chase?`}
           action={
             <Link
-              href="/invoices"
+              href="/money-in"
               className="text-sm font-medium text-primary-600 hover:text-primary-700"
             >
               See all →
@@ -92,7 +96,7 @@ export default async function Home() {
           question="Are we spending more or less than planned?"
           action={
             <Link
-              href="/budgets"
+              href="/money-out"
               className="text-sm font-medium text-primary-600 hover:text-primary-700"
             >
               See all →
@@ -144,6 +148,26 @@ export default async function Home() {
             <span className="font-semibold text-title">
               {formatRupiah(projectStats.pipelineValue)}
             </span>
+          </p>
+        </SectionCard>
+
+        <SectionCard
+          title="Debt"
+          question="How much do we still owe lenders?"
+          action={
+            <Link
+              href="/debt"
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              See all →
+            </Link>
+          }
+        >
+          <p className="text-3xl font-semibold tracking-tight text-title tabular-nums">
+            {formatRupiah(outstandingDebt)}
+          </p>
+          <p className="mt-2 text-sm text-ink-secondary">
+            Outstanding principal across {loans.length} active loan{loans.length === 1 ? "" : "s"}.
           </p>
         </SectionCard>
       </div>

@@ -3,11 +3,11 @@
 import { PROJECT_HEALTH_ORDER, projectHealth } from "./derive.js";
 import type { ExpenseRow, InvoiceRow, ProjectRow } from "./queries.js";
 
-/** Σ invoice amount per project id, excluding voided (ERD accrual rule). */
+/** Σ invoice amount per project id, excluding voided and not-yet-posted (ERD accrual rule). */
 export function billedByProject(invoices: InvoiceRow[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const inv of invoices) {
-    if (inv.voided_at) continue;
+    if (inv.voided_at || inv.status !== "posted") continue;
     map.set(inv.project.id, (map.get(inv.project.id) ?? 0) + inv.amount);
   }
   return map;

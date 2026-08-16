@@ -10,10 +10,14 @@ import { usersRouter } from "./routes/users.js";
 import { notesRouter } from "./routes/notes.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { clientsRouter } from "./routes/clients.js";
+import { partnersRouter } from "./routes/partners.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { invoicesRouter } from "./routes/invoices.js";
 import { projectsRouter } from "./routes/projects.js";
 import { trendsRouter } from "./routes/trends.js";
+import { accountingRouter } from "./routes/accounting.js";
+import { expensesRouter } from "./routes/expenses.js";
+import { attachmentsRouter } from "./routes/attachments.js";
 
 const app = express();
 
@@ -42,8 +46,12 @@ app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/invoices", requireAuth, invoicesRouter);
 app.use("/api/projects", requireAuth, projectsRouter);
 app.use("/api/clients", requireAuth, clientsRouter);
+app.use("/api/partners", requireAuth, partnersRouter);
 app.use("/api/budgets", requireAuth, budgetsRouter);
 app.use("/api/trends", requireAuth, trendsRouter);
+app.use("/api/accounting", requireAuth, accountingRouter);
+app.use("/api/expenses", requireAuth, expensesRouter);
+app.use("/api/attachments", requireAuth, attachmentsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
@@ -51,6 +59,17 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
-app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, () => {
   console.log(`finance-ids backend listening on http://localhost:${env.PORT}`);
 });
+
+// Node's default keepAliveTimeout (5s) is shorter than undici's (the
+// frontend's fetch client) idle-socket reuse window, so a socket could sit
+// in the client's pool marked reusable right as the server closed it —
+// surfacing as `UND_ERR_SOCKET: other side closed` on the next request over
+// that connection. headersTimeout must stay above keepAliveTimeout per
+// Node's docs. The frontend also retries once on this error as defense in
+// depth (see my-app/src/lib/backend-fetch.ts), but fixing the timeout
+// mismatch here is what stops it from happening in the first place.
+server.keepAliveTimeout = 61_000;
+server.headersTimeout = 65_000;

@@ -8,8 +8,15 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // /logout, not /login: getCurrentUser() only returns null on a genuine
+  // 401/403 (see auth.ts) — /logout clears the cookie via a Route Handler
+  // before redirecting, which is what makes this terminate instead of
+  // proxy.ts bouncing a still-cookied visitor straight back to /.
+  // A network/5xx failure now throws instead of landing here — it's caught
+  // by the nearest error boundary (this layout has none, so the root
+  // src/app/error.tsx), not treated as logged-out.
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/logout");
 
   return (
     <div className="flex min-h-screen">

@@ -10,6 +10,11 @@ export function formatRupiah(amount: number): string {
   return `Rp ${v.toLocaleString("id-ID", { maximumFractionDigits: 0 })} jt`;
 }
 
+/** Full-precision Rupiah — for the accounting dashboard, where exact ledger figures matter and "Rp 0 jt" would hide anything under a million. */
+export function formatRupiahExact(amount: number): string {
+  return `Rp ${Math.round(amount).toLocaleString("id-ID")}`;
+}
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric",

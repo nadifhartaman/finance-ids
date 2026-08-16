@@ -1,63 +1,81 @@
 "use server";
 
-/** Invoice create/edit/void (Phase 3 of .scratch/user-management/PRD.md) — invoices.write role. */
+/** Invoice document writes (invoices.write role) — Draft ▸ Posted lifecycle, backed by /api/invoices. */
 import { revalidatePath } from "next/cache";
 import { authedFetch, patchAction } from "./authed-fetch";
+import { APP_ROUTES, invoiceRoute } from "./routes";
 
-export interface InvoiceFormState {
-  error: string | null;
-  success?: boolean;
+export interface InvoiceDocInput {
+  invoiceNumber: string;
+  projectId: string;
+  amount: number;
+  issuedDate: string;
+  dueDate: string;
 }
 
-export async function createInvoice(
-  _prevState: InvoiceFormState,
-  formData: FormData,
-): Promise<InvoiceFormState> {
-  const invoiceNumber = formData.get("invoiceNumber");
-  const projectId = formData.get("projectId");
-  const amount = Number(formData.get("amount"));
-  const issuedDate = formData.get("issuedDate");
-  const dueDate = formData.get("dueDate");
-
-  if (
-    typeof invoiceNumber !== "string" ||
-    !invoiceNumber.trim() ||
-    typeof projectId !== "string" ||
-    !projectId ||
-    !Number.isFinite(amount) ||
-    amount <= 0 ||
-    typeof issuedDate !== "string" ||
-    typeof dueDate !== "string"
-  ) {
-    return { error: "All fields are required, and amount must be positive." };
-  }
-
+/** Creates a draft — nothing posts to the ledger until postInvoiceDoc is called. */
+export async function createInvoiceDraft(
+  input: InvoiceDocInput,
+): Promise<{ id: string | null; error: string | null }> {
   const res = await authedFetch("/api/invoices", {
     method: "POST",
-    body: JSON.stringify({ invoiceNumber: invoiceNumber.trim(), projectId, amount, issuedDate, dueDate }),
+    body: JSON.stringify(input),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    return { error: body?.error ?? "Failed to create invoice." };
+    return { id: null, error: body?.error ?? "Failed to create invoice." };
   }
-
-  revalidatePath("/invoices");
+  const { id } = await res.json();
+  revalidatePath(APP_ROUTES.receivables);
   revalidatePath("/");
-  return { error: null, success: true };
+  return { id, error: null };
 }
 
-export async function updateInvoice(
+/** Edits a draft in place — the backend rejects this once the invoice is posted. */
+export async function updateInvoiceDraft(
   id: string,
-  input: { amount: number; issuedDate: string; dueDate: string },
+  input: Partial<InvoiceDocInput>,
 ): Promise<{ error: string | null }> {
-  return patchAction(`/api/invoices/${id}`, input, ["/invoices", "/"], "Failed to update invoice.");
+  return patchAction(
+    `/api/invoices/${id}`,
+    input,
+    [invoiceRoute(id), APP_ROUTES.receivables],
+    "Failed to update invoice.",
+    "PATCH",
+  );
 }
 
+/** Posts a draft: generates the ledger entry (Dr A/R, Cr Revenue). */
+export async function postInvoiceDoc(id: string): Promise<{ error: string | null }> {
+  const res = await authedFetch(`/api/invoices/${id}/post`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    return { error: body?.error ?? "Failed to post invoice." };
+  }
+  revalidatePath(invoiceRoute(id));
+  revalidatePath(APP_ROUTES.receivables);
+  revalidatePath("/");
+  return { error: null };
+}
+
+/** Cancels a draft in place — no ledger entry was ever created. */
+export async function cancelInvoiceDraft(id: string): Promise<{ error: string | null }> {
+  const res = await authedFetch(`/api/invoices/${id}/cancel`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    return { error: body?.error ?? "Failed to cancel invoice." };
+  }
+  revalidatePath(invoiceRoute(id));
+  revalidatePath(APP_ROUTES.receivables);
+  return { error: null };
+}
+
+/** Corrects a *posted* invoice via a reversal entry — the draft-cancel path above is for drafts. UI copy stays "Cancel invoice". */
 export async function voidInvoice(id: string): Promise<{ error: string | null }> {
   return patchAction(
     `/api/invoices/${id}/void`,
     undefined,
-    ["/invoices", "/"],
+    [invoiceRoute(id), APP_ROUTES.receivables, "/"],
     "Failed to cancel invoice.",
   );
 }
@@ -69,7 +87,7 @@ export async function recordPayment(
   return patchAction(
     `/api/invoices/${id}/payment`,
     input,
-    ["/invoices", "/"],
+    [invoiceRoute(id), APP_ROUTES.receivables, "/"],
     "Failed to record payment.",
   );
 }
