@@ -1,5 +1,8 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { TableBody, TableCell, TableHead, TableHeader, TableRoot, TableRow } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { formatRupiahExact } from "@/lib/format";
 import type { AgingBucket, PartnerAgingRow } from "@/lib/types";
 
@@ -11,25 +14,33 @@ const BUCKET_LABEL: Record<AgingBucket["label"], string> = {
   "90+": "90+ days",
 };
 
-/** Shared presentation for AR/AP aging: bucket totals + a top-partner table. Used by Receivables and Payables — both are the same shape (AgingResponse), just different partner roles and links. */
+const ROWS_PER_PAGE = 5;
+
+/** Shared presentation for AR/AP aging: bucket totals + a paginated partner table. Used by Receivables and Payables — both are the same shape (AgingResponse), just different partner roles. */
 export default function AgingBreakdown({
   buckets,
   partners,
   partnerLabel,
-  href,
   emptyLabel,
 }: {
   buckets: AgingBucket[];
   partners: PartnerAgingRow[];
   partnerLabel: string;
-  href?: string | null;
   emptyLabel: string;
 }) {
+  const [page, setPage] = useState(1);
   const total = buckets.reduce((sum, b) => sum + b.amount, 0);
 
   if (total === 0) {
     return <p className="py-10 text-center text-sm text-ink-secondary">{emptyLabel}</p>;
   }
+
+  const pageCount = Math.max(1, Math.ceil(partners.length / ROWS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = partners.slice(
+    (currentPage - 1) * ROWS_PER_PAGE,
+    currentPage * ROWS_PER_PAGE,
+  );
 
   return (
     <>
@@ -59,7 +70,7 @@ export default function AgingBreakdown({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {partners.slice(0, 8).map((p) => (
+              {pageRows.map((p) => (
                 <TableRow key={p.partnerId}>
                   <TableCell className="font-medium text-title">{p.partnerName}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatRupiahExact(p.total)}</TableCell>
@@ -72,14 +83,14 @@ export default function AgingBreakdown({
               ))}
             </TableBody>
           </TableRoot>
-        </div>
-      )}
-
-      {href && (
-        <div className="mt-3 text-right">
-          <Link href={href} className="text-sm font-medium text-primary-600 hover:text-primary-700">
-            See all →
-          </Link>
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            total={partners.length}
+            pageSize={ROWS_PER_PAGE}
+            itemLabel={`${partnerLabel.toLowerCase()}s`}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </>

@@ -1,6 +1,5 @@
 import SectionCard from "@/components/ui/section-card";
 import { getArAging } from "@/lib/api";
-import { APP_ROUTES } from "@/lib/routes";
 import AgingBreakdown from "./AgingBreakdown";
 
 export default async function ReceivablesSection({ asOf }: { asOf: string }) {
@@ -12,7 +11,6 @@ export default async function ReceivablesSection({ asOf }: { asOf: string }) {
         buckets={buckets}
         partners={partners}
         partnerLabel="Customer"
-        href={APP_ROUTES.receivables}
         emptyLabel="No open invoices as of this date."
       />
     </SectionCard>
