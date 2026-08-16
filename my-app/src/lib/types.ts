@@ -368,6 +368,22 @@ export interface DebtResponse {
   loans: DebtOutstandingRow[];
 }
 
+export interface LoanInput {
+  reference: string;
+  lenderPartnerId: string;
+  liabilityAccountId: string;
+  principalAmount: number;
+  interestRatePct?: number | null;
+  startDate: string;
+  maturityDate?: string | null;
+}
+
+export interface RepaymentInput {
+  principalAmount?: number;
+  interestAmount?: number;
+  paymentDate: string;
+}
+
 export interface MonthlyPLRow {
   month: string;
   revenue: number;

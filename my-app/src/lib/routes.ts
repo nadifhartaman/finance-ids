@@ -10,6 +10,7 @@ export const APP_ROUTES = {
   expenses: "/money-out/expenses",
   newExpense: "/money-out/expenses/new",
   newInvoice: "/money-in/invoices/new",
+  newLoan: "/debt/new",
 } as const satisfies Record<string, string>;
 
 /** One dynamic drill-down, not three files — see my-app/CLAUDE.md's nested-route exception. */
