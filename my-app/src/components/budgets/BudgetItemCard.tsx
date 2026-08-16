@@ -23,6 +23,7 @@ export default function BudgetItemCard({
   href,
   linkLabel,
   footnote,
+  compact,
 }: {
   item: BudgetItem;
   /** Renders an "Edit budget" affordance; only passed for roles with `budgets.edit`. */
@@ -34,15 +35,19 @@ export default function BudgetItemCard({
   linkLabel?: string;
   /** Extra line under the health bar, e.g. a "N drafts waiting" count. */
   footnote?: ReactNode;
+  /** Tighter padding, no separate budget/spent line — used for display-only strips. */
+  compact?: boolean;
 }) {
   const health = item.health;
 
   return (
-    <article className="rounded-2xl border border-card-border bg-card p-5 shadow-xs">
+    <article
+      className={`rounded-2xl border border-card-border bg-card shadow-xs ${compact ? "p-4" : "p-5"}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-title">{item.name}</h3>
-          {item.subtitle && (
+          {!compact && item.subtitle && (
             <p className="text-xs text-ink-muted">{item.subtitle}</p>
           )}
         </div>

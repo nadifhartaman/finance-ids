@@ -35,7 +35,7 @@ export default function BudgetList({
   items: BudgetItem[];
   canEdit: boolean;
   kind: "category" | "project";
-  layout?: "stack" | "grid";
+  layout?: "stack" | "grid" | "strip";
   /** Passed through to cards that have no plan in the current scope. */
   noPlanHint?: string;
   /** Collapse to this many items behind a "Show all" toggle when there are more. */
@@ -84,7 +84,9 @@ export default function BudgetList({
     <>
       <div
         className={
-          layout === "grid" ? "grid gap-4 sm:grid-cols-2" : "space-y-4"
+          layout === "grid" || layout === "strip"
+            ? `grid gap-4 ${layout === "strip" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`
+            : "space-y-4"
         }
       >
         {visibleItems.map((item) => {
@@ -97,6 +99,7 @@ export default function BudgetList({
               item={item}
               onEdit={canEdit ? () => openEditor(item) : undefined}
               noPlanHint={noPlanHint}
+              compact={layout === "strip"}
               href={
                 kind === "category" && linkToExpenses
                   ? expensesLaneRoute(category)
