@@ -29,7 +29,7 @@ export default async function MoneyOutKpiRow({
         iconClasses="bg-primary-50 text-primary-500"
       />
       <KpiCard
-        label="We owe"
+        label="Unpaid bills"
         sublabel={`As of ${range.end}`}
         value={weOwe}
         href={APP_ROUTES.payables}
@@ -38,7 +38,7 @@ export default async function MoneyOutKpiRow({
       />
       <KpiCard
         label="Overdue bills"
-        sublabel={`As of ${range.end}`}
+        sublabel={`More than 30 days late · as of ${range.end}`}
         value={overdue}
         href={APP_ROUTES.payables}
         Icon={BellIcon}

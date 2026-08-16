@@ -19,7 +19,7 @@ import { APP_ROUTES, expenseRoute } from "@/lib/routes";
 
 const ROWS_PER_PAGE = 10;
 
-const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   payroll: "Payroll",
   operations: "Operational",
   project_costs: "Project costs",
@@ -33,7 +33,7 @@ const STATUS_FILTERS: { value: ExpenseDocStatus | "all"; label: string }[] = [
 ];
 
 /** Draft/Posted/Cancelled chip — Voided is a display-only overlay on a posted row (voidedAt set), not a real status value. */
-function statusDisplay(expense: ExpenseDocument): { label: string; color: ChipColor } {
+export function statusDisplay(expense: ExpenseDocument): { label: string; color: ChipColor } {
   if (expense.voidedAt) return { label: "Voided", color: "error" };
   if (expense.status === "draft") return { label: "Draft", color: "primary" };
   if (expense.status === "cancelled") return { label: "Cancelled", color: "gray" };
