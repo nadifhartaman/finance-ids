@@ -229,7 +229,6 @@ dashboardRouter.get("/", async (_req, res) => {
   const totalUnpaid = allUnpaidInvoices.reduce((s, { outstanding }) => s + outstanding, 0);
 
   const unpaidInvoices = allUnpaidInvoices
-    .slice(0, 4)
     .map(({ inv, status, outstanding }) => ({
       id: inv.id,
       number: inv.invoice_number,
