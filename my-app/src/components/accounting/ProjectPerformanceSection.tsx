@@ -7,8 +7,8 @@ export default async function ProjectPerformanceSection() {
 
   return (
     <SectionCard
-      title="Project Performance"
-      question="Which projects are actually making us money, as of the ledger?"
+      title="Project Performance (Top 10 by profit)"
+      question="The 10 most profitable projects, as of the ledger — which are actually making us money?"
     >
       {projects.length === 0 ? (
         <p className="py-10 text-center text-sm text-ink-secondary">No project-tagged postings yet.</p>

@@ -7,10 +7,12 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableFillerRows,
   TableRoot,
   TableRow,
 } from "@/components/ui/table";
 import { Chip, type ChipColor } from "@/components/ui/chip";
+import { Pagination } from "@/components/ui/pagination";
 import type { ClientOption, Project, ProjectHealthKind } from "@/lib/types";
 import { formatRupiah } from "@/lib/format";
 import { deleteProject } from "@/lib/projects-actions";
@@ -22,6 +24,8 @@ const STATUS_CHIP_COLOR: Record<ProjectHealthKind, ChipColor> = {
   "near-billing": "primary",
   "on-schedule": "success",
 };
+
+const ROWS_PER_PAGE = 5;
 
 export default function ProjectTable({
   projects,
@@ -41,6 +45,14 @@ export default function ProjectTable({
   const [notice, setNotice] = useState<string | null>(null);
   const [formTarget, setFormTarget] = useState<Project | "create" | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [page, setPage] = useState(1);
+
+  const pageCount = Math.max(1, Math.ceil(projects.length / ROWS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = projects.slice(
+    (currentPage - 1) * ROWS_PER_PAGE,
+    currentPage * ROWS_PER_PAGE,
+  );
 
   function handleDelete(project: Project) {
     if (!window.confirm(`Delete project "${project.name}"? This can't be undone.`)) return;
@@ -93,7 +105,7 @@ export default function ProjectTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {projects.map((project) => {
+          {pageRows.map((project) => {
             const health = project.health;
             return (
               <TableRow key={project.id}>
@@ -156,8 +168,21 @@ export default function ProjectTable({
               </TableRow>
             );
           })}
+          <TableFillerRows
+            count={ROWS_PER_PAGE - pageRows.length}
+            colSpan={5 + (canFlag || canWrite ? 1 : 0)}
+          />
         </TableBody>
       </TableRoot>
+
+      <Pagination
+        page={currentPage}
+        pageCount={pageCount}
+        total={projects.length}
+        pageSize={ROWS_PER_PAGE}
+        itemLabel="projects"
+        onPageChange={setPage}
+      />
 
       {canWrite && (
         <ProjectFormDialog

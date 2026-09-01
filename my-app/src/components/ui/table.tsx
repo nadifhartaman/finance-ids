@@ -64,3 +64,17 @@ const tableCellStyles = cva("px-5 py-3.5 text-ink-secondary");
 export function TableCell({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn(tableCellStyles(), className)} {...props} />;
 }
+
+/** Pads a short page out to a fixed row count so pagination doesn't change the table's height. */
+export function TableFillerRows({ count, colSpan }: { count: number; colSpan: number }) {
+  if (count <= 0) return null;
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <TableRow key={`filler-${i}`} aria-hidden="true">
+          <TableCell colSpan={colSpan}>&nbsp;</TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}

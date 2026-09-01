@@ -44,6 +44,9 @@ export default function UnpaidInvoices({ invoices }: { invoices: DashboardUnpaid
             </li>
           );
         })}
+        {Array.from({ length: ROWS_PER_PAGE - pageRows.length }, (_, i) => (
+          <li key={`filler-${i}`} aria-hidden="true" className="py-3">&nbsp;</li>
+        ))}
       </ul>
       <Pagination
         page={currentPage}
