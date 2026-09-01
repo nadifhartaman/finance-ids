@@ -20,11 +20,13 @@ import {
   fetchApAging,
   fetchDebtOutstanding,
   fetchMonthlyPL,
+  fetchIncomeStatement,
   fetchCashFlow,
   CashFlowGranularity,
   fetchAllProjectPL,
   fetchJournalEntries,
   fetchJournalEntryById,
+  type GeneralLedgerFilters,
 } from "../lib/accounting/reports.js";
 import { isIsoDate } from "../lib/validate.js";
 
@@ -67,9 +69,17 @@ accountingRouter.get("/summary", requirePermission("accounting.reports.read"), a
 });
 
 accountingRouter.get("/general-ledger", requirePermission("accounting.reports.read"), async (req, res) => {
-  const { accountId, projectId, partnerId, from, to } = req.query;
+  const { accountId, accountSubtype, projectId, partnerId, from, to } = req.query;
+  const accountSubtypes = (
+    Array.isArray(accountSubtype)
+      ? accountSubtype.filter((s): s is string => typeof s === "string")
+      : typeof accountSubtype === "string"
+        ? [accountSubtype]
+        : undefined
+  ) as GeneralLedgerFilters["accountSubtypes"];
   const lines = await fetchGeneralLedger({
     accountId: typeof accountId === "string" ? accountId : undefined,
+    accountSubtypes,
     projectId: typeof projectId === "string" ? projectId : undefined,
     partnerId: typeof partnerId === "string" ? partnerId : undefined,
     from: typeof from === "string" ? from : undefined,
@@ -190,6 +200,21 @@ accountingRouter.get("/pl-monthly", requirePermission("accounting.reports.read")
   }
   const months = await fetchMonthlyPL(from, to);
   res.json({ from, to, months });
+});
+
+/** Period income statement (revenue/expense lines, not just totals) — see fetchIncomeStatement for why /pl-monthly's month buckets aren't enough here. */
+accountingRouter.get("/income-statement", requirePermission("accounting.reports.read"), async (req, res) => {
+  const { from, to } = req.query;
+  if (!isIsoDate(from) || !isIsoDate(to)) {
+    res.status(400).json({ error: "from and to are required, YYYY-MM-DD" });
+    return;
+  }
+  if (from > to) {
+    res.status(400).json({ error: "from must be on or before to" });
+    return;
+  }
+  const statement = await fetchIncomeStatement(from, to);
+  res.json(statement);
 });
 
 const CASH_FLOW_GRANULARITIES: CashFlowGranularity[] = ["day", "week", "month"];

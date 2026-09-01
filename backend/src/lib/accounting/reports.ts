@@ -12,6 +12,7 @@ import { resolveAccount, expenseAccountKey } from "./coa.js";
 
 type LoanStatus = Database["public"]["Enums"]["loan_status"];
 type ExpenseCategory = Database["public"]["Enums"]["expense_category"];
+type AccountSubtype = Database["public"]["Enums"]["account_subtype"];
 
 const EXPENSE_CATEGORIES: readonly ExpenseCategory[] = ["payroll", "operations", "project_costs"];
 
@@ -114,6 +115,7 @@ export async function fetchAllProjectPL(asOf?: string, limit = 10): Promise<Proj
 
 export interface GeneralLedgerFilters {
   accountId?: string;
+  accountSubtypes?: AccountSubtype[];
   projectId?: string;
   partnerId?: string;
   from?: string;
@@ -147,6 +149,7 @@ export async function fetchGeneralLedger(filters: GeneralLedgerFilters = {}): Pr
     .order("entry_number");
 
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
+  if (filters.accountSubtypes?.length) query = query.in("account_subtype", filters.accountSubtypes);
   if (filters.projectId) query = query.eq("project_id", filters.projectId);
   if (filters.partnerId) query = query.eq("partner_id", filters.partnerId);
   if (filters.from) query = query.gte("accounting_date", filters.from);
@@ -214,6 +217,57 @@ export async function fetchMonthlyPL(from: string, to: string): Promise<MonthlyP
     const bucket = byMonth.get(month) ?? { revenue: 0, expenses: 0 };
     return { month, revenue: bucket.revenue, expenses: bucket.expenses, netIncome: bucket.revenue - bucket.expenses };
   });
+}
+
+export interface IncomeStatementLine {
+  accountCode: string;
+  accountName: string;
+  amount: number;
+}
+
+export interface IncomeStatement {
+  from: string;
+  to: string;
+  revenue: IncomeStatementLine[];
+  expenses: IncomeStatementLine[];
+  totalRevenue: number;
+  totalExpenses: number;
+  netIncome: number;
+}
+
+/** Per-account revenue/expense lines over [from, to] — fn_trial_balance only takes a single asOf (inception-to-date), so a period-scoped statement needs its own aggregation over v_posted_lines, same pattern as fetchMonthlyPL. */
+export async function fetchIncomeStatement(from: string, to: string): Promise<IncomeStatement> {
+  const { data, error } = await supabase
+    .from("v_posted_lines")
+    .select("account_code, account_name, account_type, debit, credit")
+    .in("account_type", ["revenue", "expense"])
+    .gte("accounting_date", from)
+    .lte("accounting_date", to);
+  if (error) throw new Error(error.message);
+  console.log(`[accounting.income-statement] fetched ${data.length} rows for ${from}..${to}`);
+
+  const byAccount = new Map<string, { accountName: string; accountType: string; amount: number }>();
+  for (const row of data) {
+    const existing = byAccount.get(row.account_code);
+    const delta = row.account_type === "revenue" ? row.credit - row.debit : row.debit - row.credit;
+    if (existing) existing.amount += delta;
+    else byAccount.set(row.account_code, { accountName: row.account_name, accountType: row.account_type, amount: delta });
+  }
+
+  const revenue: IncomeStatementLine[] = [];
+  const expenses: IncomeStatementLine[] = [];
+  for (const [accountCode, { accountName, accountType, amount }] of byAccount) {
+    const line = { accountCode, accountName, amount };
+    if (accountType === "revenue") revenue.push(line);
+    else expenses.push(line);
+  }
+  revenue.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+  expenses.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+
+  const totalRevenue = revenue.reduce((sum, l) => sum + l.amount, 0);
+  const totalExpenses = expenses.reduce((sum, l) => sum + l.amount, 0);
+
+  return { from, to, revenue, expenses, totalRevenue, totalExpenses, netIncome: totalRevenue - totalExpenses };
 }
 
 export type CashFlowGranularity = "day" | "week" | "month";
