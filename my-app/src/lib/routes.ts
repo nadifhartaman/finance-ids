@@ -11,6 +11,12 @@ export const APP_ROUTES = {
   newExpense: "/money-out/expenses/new",
   newInvoice: "/money-in/invoices/new",
   newLoan: "/debt/new",
+  reports: "/reports",
+  journal: "/reports/journal",
+  trialBalance: "/reports/trial-balance",
+  incomeStatement: "/reports/income-statement",
+  balanceSheet: "/reports/balance-sheet",
+  cashFlowStatement: "/reports/cash-flow",
 } as const satisfies Record<string, string>;
 
 /** One dynamic drill-down, not three files — see my-app/CLAUDE.md's nested-route exception. */
@@ -21,6 +27,11 @@ export function expenseRoute(id: string): string {
 /** Same nested-route exception as expenses — see my-app/CLAUDE.md. */
 export function invoiceRoute(id: string): string {
   return `/money-in/invoices/${id}`;
+}
+
+/** Same nested-route exception, /reports — see my-app/CLAUDE.md. */
+export function journalEntryRoute(id: string): string {
+  return `/reports/journal/${id}`;
 }
 
 export function expensesLaneRoute(category: "payroll" | "operations" | "project_costs"): string {

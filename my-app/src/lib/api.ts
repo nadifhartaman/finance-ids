@@ -17,8 +17,13 @@ import {
   ExpenseDocument,
   ExpenseDocumentsResponse,
   FinancialSummary,
+  GeneralLedgerResponse,
+  IncomeStatement,
   InvoiceDocument,
   InvoicesResponse,
+  JournalEntriesResponse,
+  JournalEntryDetail,
+  JournalEntryStatus,
   LoanStatus,
   NotesResponse,
   PartnersResponse,
@@ -26,6 +31,7 @@ import {
   ProjectProfitabilityResponse,
   ProjectsResponse,
   TrendsResponse,
+  TrialBalanceResponse,
 } from "./types";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
@@ -173,4 +179,61 @@ export const getApAging = cache((asOf?: string): Promise<AgingResponse> => {
 export const getDebt = cache((status?: LoanStatus): Promise<DebtResponse> => {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return getJson<DebtResponse>(`/api/accounting/debt${query}`);
+});
+
+// ----------------------------------------------------------------------------
+// Accounting statements — /reports/* pages. Same read-only, ledger-backed
+// pattern as the section above.
+// ----------------------------------------------------------------------------
+
+export const getTrialBalance = cache((asOf?: string): Promise<TrialBalanceResponse> => {
+  const query = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
+  return getJson<TrialBalanceResponse>(`/api/accounting/trial-balance${query}`);
+});
+
+export const getIncomeStatement = cache((from: string, to: string): Promise<IncomeStatement> => {
+  const query = new URLSearchParams({ from, to });
+  return getJson<IncomeStatement>(`/api/accounting/income-statement?${query}`);
+});
+
+export const getJournalEntries = cache((params?: {
+  from?: string;
+  to?: string;
+  journalCode?: string;
+  status?: JournalEntryStatus;
+  page?: number;
+  limit?: number;
+}): Promise<JournalEntriesResponse> => {
+  const query = new URLSearchParams();
+  if (params?.from) query.set("from", params.from);
+  if (params?.to) query.set("to", params.to);
+  if (params?.journalCode) query.set("journalCode", params.journalCode);
+  if (params?.status) query.set("status", params.status);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  return getJson<JournalEntriesResponse>(`/api/accounting/entries${qs ? `?${qs}` : ""}`);
+});
+
+export const getJournalEntry = cache((id: string): Promise<JournalEntryDetail> => {
+  return getJson<JournalEntryDetail>(`/api/accounting/entries/${id}`);
+});
+
+export const getGeneralLedger = cache((params?: {
+  accountId?: string;
+  accountSubtypes?: string[];
+  projectId?: string;
+  partnerId?: string;
+  from?: string;
+  to?: string;
+}): Promise<GeneralLedgerResponse> => {
+  const query = new URLSearchParams();
+  if (params?.accountId) query.set("accountId", params.accountId);
+  for (const subtype of params?.accountSubtypes ?? []) query.append("accountSubtype", subtype);
+  if (params?.projectId) query.set("projectId", params.projectId);
+  if (params?.partnerId) query.set("partnerId", params.partnerId);
+  if (params?.from) query.set("from", params.from);
+  if (params?.to) query.set("to", params.to);
+  const qs = query.toString();
+  return getJson<GeneralLedgerResponse>(`/api/accounting/general-ledger${qs ? `?${qs}` : ""}`);
 });
