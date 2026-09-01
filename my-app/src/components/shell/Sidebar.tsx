@@ -49,6 +49,16 @@ export default function Sidebar() {
           );
         })}
       </nav>
+      <div className="mt-auto border-t border-card-border px-3 py-3">
+        <Link
+          href="/reports"
+          className={`block rounded-lg px-3 py-2 text-xs font-medium ${
+            pathname.startsWith("/reports") ? "text-primary-600" : "text-ink-muted hover:text-title"
+          }`}
+        >
+          Accounting reports
+        </Link>
+      </div>
     </aside>
   );
 }

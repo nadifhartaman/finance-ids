@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TableBody, TableCell, TableHead, TableHeader, TableRoot, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableFillerRows, TableHead, TableHeader, TableRoot, TableRow } from "@/components/ui/table";
 import { Chip } from "@/components/ui/chip";
 import { Pagination } from "@/components/ui/pagination";
 import RecordRepaymentDialog from "./RecordRepaymentDialog";
@@ -89,6 +89,10 @@ export default function LoansTable({
               )}
             </TableRow>
           ))}
+          <TableFillerRows
+            count={ROWS_PER_PAGE - pageRows.length}
+            colSpan={canWrite ? 8 : 7}
+          />
         </TableBody>
       </TableRoot>
       <Pagination

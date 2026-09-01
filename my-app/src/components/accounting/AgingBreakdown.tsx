@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TableBody, TableCell, TableHead, TableHeader, TableRoot, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableFillerRows, TableHead, TableHeader, TableRoot, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { formatRupiahExact } from "@/lib/format";
 import type { AgingBucket, PartnerAgingRow } from "@/lib/types";
@@ -81,6 +81,7 @@ export default function AgingBreakdown({
                   </TableCell>
                 </TableRow>
               ))}
+              <TableFillerRows count={ROWS_PER_PAGE - pageRows.length} colSpan={3} />
             </TableBody>
           </TableRoot>
           <Pagination

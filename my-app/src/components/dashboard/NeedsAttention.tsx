@@ -48,6 +48,9 @@ export default function NeedsAttention({ items }: { items: AttentionItem[] }) {
             </li>
           );
         })}
+        {Array.from({ length: ROWS_PER_PAGE - pageItems.length }, (_, i) => (
+          <li key={`filler-${i}`} aria-hidden="true" className="py-3">&nbsp;</li>
+        ))}
       </ul>
       <Pagination
         page={currentPage}

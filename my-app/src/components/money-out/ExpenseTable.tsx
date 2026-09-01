@@ -8,6 +8,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableFillerRows,
   TableRoot,
   TableRow,
 } from "@/components/ui/table";
@@ -232,6 +233,9 @@ export default function ExpenseTable({
                   </TableRow>
                 );
               })
+            )}
+            {pageRows.length > 0 && (
+              <TableFillerRows count={ROWS_PER_PAGE - pageRows.length} colSpan={9} />
             )}
           </TableBody>
           {pageRows.length > 0 && (

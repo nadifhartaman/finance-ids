@@ -9,6 +9,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableFillerRows,
   TableRoot,
   TableRow,
 } from "@/components/ui/table";
@@ -269,6 +270,12 @@ export default function InvoiceTable({
                   </TableRow>
                 );
               })
+            )}
+            {pageRows.length > 0 && (
+              <TableFillerRows
+                count={ROWS_PER_PAGE - pageRows.length}
+                colSpan={canWrite ? 7 : 6}
+              />
             )}
           </TableBody>
         </TableRoot>

@@ -434,3 +434,114 @@ export interface ProjectProfitabilityResponse {
   projects: ProjectProfitabilityRow[];
 }
 
+// ----------------------------------------------------------------------------
+// Statement reports (/reports/*) — Trial balance, income statement, general
+// ledger, and journal entries. See backend/src/lib/accounting/reports.ts.
+// ----------------------------------------------------------------------------
+
+export interface TrialBalanceRow {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  accountSubtype: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface TrialBalanceResponse {
+  asOf: string | null;
+  accounts: TrialBalanceRow[];
+}
+
+export interface IncomeStatementLine {
+  accountCode: string;
+  accountName: string;
+  amount: number;
+}
+
+export interface IncomeStatement {
+  from: string;
+  to: string;
+  revenue: IncomeStatementLine[];
+  expenses: IncomeStatementLine[];
+  totalRevenue: number;
+  totalExpenses: number;
+  netIncome: number;
+}
+
+export type JournalEntryStatus = "draft" | "posted" | "cancelled";
+
+export interface JournalEntryRow {
+  id: string;
+  entryNumber: string;
+  accountingDate: string;
+  journalCode: string;
+  journalName: string;
+  description: string;
+  reference: string | null;
+  sourceType: string;
+  status: string;
+  amount: number;
+}
+
+export interface JournalEntriesResponse {
+  data: JournalEntryRow[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+export interface JournalEntryDetailLine {
+  id: string;
+  lineNo: number;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  description: string | null;
+  debit: number;
+  credit: number;
+}
+
+export interface JournalEntryDetail {
+  id: string;
+  entryNumber: string;
+  journalId: string;
+  journalCode: string;
+  journalName: string;
+  accountingDate: string;
+  reference: string | null;
+  description: string;
+  status: string;
+  sourceType: string;
+  sourceId: string | null;
+  reversalOfId: string | null;
+  lines: JournalEntryDetailLine[];
+}
+
+export interface GeneralLedgerLine {
+  lineId: string;
+  journalEntryId: string;
+  entryNumber: string;
+  journalCode: string;
+  accountingDate: string;
+  accountCode: string;
+  accountName: string;
+  description: string | null;
+  debit: number;
+  credit: number;
+  partnerId: string | null;
+  projectId: string | null;
+  sourceType: string;
+  sourceId: string | null;
+}
+
+export interface GeneralLedgerResponse {
+  lines: GeneralLedgerLine[];
+}
+
